@@ -18,33 +18,32 @@ Navigate to the controller directory
 cd CSCI555/Scaler/controller
 
 Build the Docker image
-docker build -t predictive-autoscaler:latest .
+`docker build -t predictive-autoscaler:latest .`
 
 Tag and push to your container registry
-docker tag predictive-autoscaler:latest ${YOUR_REGISTRY}/predictive-autoscaler:latest
-docker push ${YOUR_REGISTRY}/predictive-autoscaler:latest
+`docker tag predictive-autoscaler:latest ${REGISTRY}/predictive-autoscaler:latest`
+
+`docker push ${REGISTRY}/predictive-autoscaler:latest`
 
 ### Update the controller deployment with your image registry
-Edit CSCI555/Scaler/deploy/controller-deployment.yaml and replace ${YOUR_REGISTRY} with your actual container registry.
+Edit CSCI555/Scaler/deploy/controller-deployment.yaml and replace ${REGISTRY} with actual container registry.
 
 ### Apply CRD first
-kubectl apply -f CSCI555/Scaler/crd/predictive-autoscaler-crd.yaml
+`kubectl apply -f CSCI555/Scaler/crd/predictive-autoscaler-crd.yaml`
 
 ### Apply RBAC
-kubectl apply -f CSCI555/Scaler/deploy/rbac.yaml
+`kubectl apply -f CSCI555/Scaler/deploy/rbac.yaml`
 
 ### Apply controller deployment
-kubectl apply -f CSCI555/Scaler/deploy/controller-deployment.yaml
-
-
+`kubectl apply -f CSCI555/Scaler/deploy/controller-deployment.yaml`
 
 ### Apply the PredictiveAutoscaler instance
-kubectl apply -f CSCI555/Scaler/deploy/predictive-autoscaler-instance.yaml
+`kubectl apply -f CSCI555/Scaler/deploy/predictive-autoscaler-instance.yaml`
 
 ### Check if the controller is running
-kubectl get pods -l app=predictive-autoscaler-controller
+`kubectl get pods -l app=predictive-autoscaler-controller`
 
 ### Check if the PredictiveAutoscaler instance is running   
-kubectl get pods -l app=predictive-autoscaler-instance
+`kubectl get pods -l app=predictive-autoscaler-instance`
 
 
