@@ -1,0 +1,68 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: predictiveautoscalers.scaler.cs.columbia.edu
+spec:
+  group: scaler.cs.columbia.edu
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                targetDeployment:
+                  type: string
+                targetHPA:
+                  type: string
+                maxReplicas:
+                  type: integer
+                  minimum: 1
+                historyRetentionDays:
+                  type: integer
+                  minimum: 1
+                  default: 7
+                updateInterval:
+                  type: integer
+                  minimum: 1
+                  default: 5
+                predictionWindowMinutes:
+                  type: integer
+                  minimum: 1
+                  default: 10
+                historicalWeight:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                  default: 0.7
+                currentWeight:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                  default: 0.3
+              required:
+                - targetDeployment
+                - targetHPA
+                - maxReplicas
+            status:
+              type: object
+              properties:
+                lastUpdated:
+                  type: string
+                currentPrediction:
+                  type: integer
+                lastError:
+                  type: string
+      subresources:
+        status: {}
+  scope: Namespaced
+  names:
+    plural: predictiveautoscalers
+    singular: predictiveautoscaler
+    kind: PredictiveAutoscaler
+    shortNames:
+    - pa 
