@@ -25,10 +25,13 @@ PLURAL = "predictiveautoscalers"
 def ensure_data_dir():
     os.makedirs(DATA_DIR, exist_ok=True)
 
-def get_history_file_path(namespace, name):
-    return os.path.join(DATA_DIR, f"{namespace}_{name}_history.json")
+def get_history_file_path(namespace=None, name=None):
+    if not namespace and not name: #to be used for testing
+        return os.path.join(DATA_DIR, "./test-data/realistic-traffic.json") 
+    else:
+        return os.path.join(DATA_DIR, f"{namespace}_{name}_history.json")
 
-def load_historical_data(namespace, name):
+def load_historical_data(namespace=None, name=None):
     file_path = get_history_file_path(namespace, name)
     if not os.path.exists(file_path):
         return {"data": []}
@@ -39,7 +42,7 @@ def load_historical_data(namespace, name):
     except json.JSONDecodeError:
         return {"data": []}
 
-def save_historical_data(namespace, name, data):
+def save_historical_data(data, namespace=None, name=None):
     ensure_data_dir()
     file_path = get_history_file_path(namespace, name)
     
