@@ -47,3 +47,12 @@ Edit CSCI555/Scaler/deploy/controller-deployment.yaml and replace ${REGISTRY} wi
 `kubectl get pods -l app=predictive-autoscaler-instance`
 
 
+### Test the controller
+#### Create the directory in your persistent volume if needed
+`kubectl exec -it predictive-autoscaler-controller-xxx -- mkdir -p /data`
+
+#### Copy the sample data file to your controller pod
+`kubectl cp CSCI555/Scaler/test-data/sample-history.json predictive-autoscaler-controller-xxx:/data/default_simpleweb-predictor_history.json`
+
+#### Check the logs to see if the controller is using the data correctly
+`kubectl logs -f deployment/predictive-autoscaler-controller`
