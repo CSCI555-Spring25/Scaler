@@ -27,7 +27,7 @@ def ensure_data_dir():
 
 def get_history_file_path(namespace=None, name=None):
     if not namespace and not name: #to be used for testing
-        return os.path.join(DATA_DIR, "./test-data/realistic-traffic.json") 
+        return os.path.join(DATA_DIR, "realistic-traffic.json") 
     else:
         return os.path.join(DATA_DIR, f"{namespace}_{name}_history.json")
 
@@ -168,7 +168,7 @@ def create_fn(spec, name, namespace, logger, **kwargs):
         now = datetime.datetime.now(datetime.timezone.utc)
         timestamp = now.replace(minute=(now.minute // 5) * 5, second=0, microsecond=0).isoformat().replace("+00:00", "Z")
         historical_data["data"].append({"timestamp": timestamp, "podCount": current_pods})
-        save_historical_data(namespace, name, historical_data)
+        save_historical_data(historical_data, namespace, name)
     
     # Setup recurring job
     def recurring_update():
@@ -216,7 +216,7 @@ def create_fn(spec, name, namespace, logger, **kwargs):
                 updated_data = update_historical_data(
                     historical_data, current_pods, historical_weight, current_weight)
                 updated_data = prune_old_data(updated_data, history_retention_days)
-                save_historical_data(namespace, name, updated_data)
+                save_historical_data(updated_data, namespace, name)
                 logger.info("Updated historical data")
                 
                 # Update status

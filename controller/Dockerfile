@@ -5,7 +5,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY controller.py .
-RUN chmod +x controller.py
+COPY . .
 
-CMD ["python", "/app/controller.py"] 
+CMD ["kopf", "run", "controller.py", "--verbose"] 

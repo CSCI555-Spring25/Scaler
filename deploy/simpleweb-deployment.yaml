@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simpleweb-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: simpleweb
+  template:
+    metadata:
+      labels:
+        app: simpleweb
+    spec:
+      containers:
+      - name: simpleweb
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi 

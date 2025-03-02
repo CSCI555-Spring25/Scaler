@@ -21,24 +21,24 @@ Build the Docker image
 `docker build -t predictive-autoscaler:latest .`
 
 Tag and push to your container registry
-`docker tag predictive-autoscaler:latest ${REGISTRY}/predictive-autoscaler:latest`
+`docker tag predictive-autoscaler:latest anirudhr120100/csci555-predictive-autoscaler:latest`
 
-`docker push ${REGISTRY}/predictive-autoscaler:latest`
+`docker push anirudhr120100/csci555-predictive-autoscaler:latest`
 
 ### Update the controller deployment with your image registry
-Edit CSCI555/Scaler/deploy/controller-deployment.yaml and replace ${REGISTRY} with actual container registry.
+Edit CSCI555/Scaler/deploy/controller-deployment.yaml 
 
 ### Apply CRD first
-`kubectl apply -f CSCI555/Scaler/crd/predictive-autoscaler-crd.yaml`
+`kubectl apply -f Scaler/crd/predictive-autoscaler-crd.yaml`
 
 ### Apply RBAC
-`kubectl apply -f CSCI555/Scaler/deploy/rbac.yaml`
+`kubectl apply -f Scaler/deploy/rbac.yaml`
 
 ### Apply controller deployment
-`kubectl apply -f CSCI555/Scaler/deploy/controller-deployment.yaml`
+`kubectl apply -f Scaler/deploy/controller-deployment.yaml`
 
 ### Apply the PredictiveAutoscaler instance
-`kubectl apply -f CSCI555/Scaler/deploy/predictive-autoscaler-instance.yaml`
+`kubectl apply -f Scaler/deploy/predictive-autoscaler-instance.yaml`
 
 ### Check if the controller is running
 `kubectl get pods -l app=predictive-autoscaler-controller`
@@ -52,7 +52,7 @@ Edit CSCI555/Scaler/deploy/controller-deployment.yaml and replace ${REGISTRY} wi
 `kubectl exec -it predictive-autoscaler-controller-xxx -- mkdir -p /data`
 
 #### Copy the sample data file to your controller pod
-`kubectl cp CSCI555/Scaler/test-data/sample-history.json predictive-autoscaler-controller-xxx:/data/default_simpleweb-predictor_history.json`
+`kubectl cp Scaler/test-data/realistic-traffic.json predictive-autoscaler-controller-xxx:/data/default_simpleweb-predictor_history.json`
 
 #### Check the logs to see if the controller is using the data correctly
 `kubectl logs -f deployment/predictive-autoscaler-controller`
