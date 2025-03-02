@@ -10,7 +10,7 @@ metadata:
   name: predictive-autoscaler-role
 rules:
   - apiGroups: [""]
-    resources: ["pods", "configmaps"]
+    resources: ["pods", "configmaps", "events"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["apps"]
     resources: ["deployments"]
