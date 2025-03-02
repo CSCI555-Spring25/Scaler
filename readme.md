@@ -26,7 +26,7 @@ Tag and push to your container registry
 `docker push anirudhr120100/csci555-predictive-autoscaler:latest`
 
 ### Update the controller deployment with your image registry
-Edit CSCI555/Scaler/deploy/controller-deployment.yaml 
+Edit /Scaler/deploy/controller-deployment.yaml 
 
 ### Apply CRD first
 `kubectl apply -f Scaler/crd/predictive-autoscaler-crd.yaml`
@@ -37,15 +37,16 @@ Edit CSCI555/Scaler/deploy/controller-deployment.yaml
 ### Apply controller deployment
 `kubectl apply -f Scaler/deploy/controller-deployment.yaml`
 
-### Apply the PredictiveAutoscaler instance
-`kubectl apply -f Scaler/deploy/predictive-autoscaler-instance.yaml`
-
 ### Check if the controller is running
 `kubectl get pods -l app=predictive-autoscaler-controller`
 
-### Check if the PredictiveAutoscaler instance is running   
-`kubectl get pods -l app=predictive-autoscaler-instance`
+### Apply the PredictiveAutoscaler instance
+`kubectl apply -f Scaler/deploy/predictive-autoscaler-instance.yaml`
 
+### Check if the PredictiveAutoscaler custom resource was created 
+`kubectl get predictiveautoscalers` 
+or
+`kubectl get pa` (using the short name)
 
 ### Test the controller
 #### Create the directory in your persistent volume if needed
@@ -56,3 +57,9 @@ Edit CSCI555/Scaler/deploy/controller-deployment.yaml
 
 #### Check the logs to see if the controller is using the data correctly
 `kubectl logs -f deployment/predictive-autoscaler-controller`
+
+#### Check if the HPA is being updated
+`kubectl get hpa`
+
+#### Check if the historical data is being updated
+`kubectl get predictiveautoscalers`

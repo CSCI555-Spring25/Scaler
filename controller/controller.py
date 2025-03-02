@@ -121,20 +121,21 @@ def calculate_required_pods(current_pods, historical_data, max_replicas, predict
     
     return required_pods
 
-def update_hpa(namespace, hpa_name, required_pods):
-    try:
-        # Get current HPA
+def update_hpa(namespace, hpa_name, min_replicas):
+    try: 
         hpa = autoscaling_api.read_namespaced_horizontal_pod_autoscaler(hpa_name, namespace)
-        
-        # Update the minReplicas to our calculated value
-        hpa.spec.min_replicas = required_pods
-        
-        # Update the HPA
-        autoscaling_api.replace_namespaced_horizontal_pod_autoscaler(hpa_name, namespace, hpa)
-        kopf.info(f"Updated HPA {hpa_name} minReplicas to {required_pods}")
+         
+        hpa.spec.min_replicas = min_replicas
+        autoscaling_api.patch_namespaced_horizontal_pod_autoscaler(
+            name=hpa_name, 
+            namespace=namespace, 
+            body={"spec": {"minReplicas": min_replicas}}
+        )
+         
+        kopf.info(f"Updated HPA {hpa_name} minReplicas to {min_replicas}") 
         return True
-    except kubernetes.client.exceptions.ApiException as e:
-        kopf.exception(f"Failed to update HPA: {e}")
+    except kubernetes.client.exceptions.ApiException as e: 
+        kopf.exception(f"Failed to update HPA {hpa_name}: {e}")
         return False
 
 def update_status(namespace, name, status_data):
