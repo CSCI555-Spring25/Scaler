@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: simpleweb-deployment
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: simpleweb
@@ -34,7 +34,6 @@ spec:
     app: simpleweb
   ports:
     - protocol: TCP
-      port: 80
+      port: 30080
       targetPort: 80
-      nodePort: 30080
-  type: NodePort
+  type: ClusterIP
