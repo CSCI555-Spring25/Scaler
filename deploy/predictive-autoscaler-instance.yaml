@@ -1,3 +1,4 @@
+---
 apiVersion: scaler.cs.columbia.edu/v1
 kind: PredictiveAutoscaler
 metadata:
@@ -10,4 +11,5 @@ spec:
   updateInterval: 5  # minutes
   predictionWindowMinutes: 10
   historicalWeight: 0.7
-  currentWeight: 0.3 
+  currentWeight: 0.3
+---

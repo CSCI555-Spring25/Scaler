@@ -1,3 +1,4 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -14,22 +15,22 @@ spec:
     spec:
       serviceAccountName: predictive-autoscaler-sa
       containers:
-      - name: controller
-        image: anirudhr120100/csci555-predictive-autoscaler:latest
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "100m"
-          limits:
-            memory: "256Mi"
-            cpu: "200m"
-        volumeMounts:
-        - name: historical-data
-          mountPath: /data
+        - name: controller
+          image: anirudhr120100/csci555-predictive-autoscaler:latest
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          volumeMounts:
+            - name: historical-data
+              mountPath: /data
       volumes:
-      - name: historical-data
-        persistentVolumeClaim:
-          claimName: historical-data-pvc
+        - name: historical-data
+          persistentVolumeClaim:
+            claimName: historical-data-pvc
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -40,4 +41,5 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi 
+      storage: 1Gi
+---
