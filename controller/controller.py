@@ -18,7 +18,7 @@ custom_api = kubernetes.client.CustomObjectsApi(api_client)
 
 # Constants
 DATA_DIR = "/data"
-GROUP = "scaler.cs.columbia.edu"
+GROUP = "scaler.cs.usc.edu"
 VERSION = "v1"
 PLURAL = "predictiveautoscalers"
 
@@ -150,7 +150,7 @@ def update_status(namespace, name, status_data):
 # Dictionary to track running timers
 timers = {}
 
-@kopf.on.create('scaler.cs.columbia.edu', 'v1', 'predictiveautoscalers')
+@kopf.on.create('scaler.cs.usc.edu', 'v1', 'predictiveautoscalers')
 def create_fn(spec, name, namespace, logger, **kwargs):
     logger.info(f"Creating PredictiveAutoscaler {name} in namespace {namespace}")
     
@@ -275,7 +275,7 @@ def check_if_cr_exists(namespace, name):
             return False
         raise
 
-@kopf.on.delete('scaler.cs.columbia.edu', 'v1', 'predictiveautoscalers')
+@kopf.on.delete('scaler.cs.usc.edu', 'v1', 'predictiveautoscalers')
 def delete_fn(spec, name, namespace, logger, **kwargs):
     logger.info(f"Deleting PredictiveAutoscaler {name} in namespace {namespace}")
     
@@ -286,7 +286,7 @@ def delete_fn(spec, name, namespace, logger, **kwargs):
     
     return {'autoscalerStopped': True}
 
-@kopf.on.update('scaler.cs.columbia.edu', 'v1', 'predictiveautoscalers')
+@kopf.on.update('scaler.cs.usc.edu', 'v1', 'predictiveautoscalers')
 def update_fn(spec, old, name, namespace, logger, **kwargs):
     logger.info(f"Updating PredictiveAutoscaler {name} in namespace {namespace}")
     if f"{namespace}_{name}" in timers:

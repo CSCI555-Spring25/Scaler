@@ -25,10 +25,10 @@ rules:
     verbs: ["get", "list", "watch", "update", "patch"]
   
   # Custom Resources access for PredictiveAutoscalers
-  - apiGroups: ["scaler.cs.columbia.edu"]
+  - apiGroups: ["scaler.cs.usc.edu"]
     resources: ["predictiveautoscalers"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: ["scaler.cs.columbia.edu"]
+  - apiGroups: ["scaler.cs.usc.edu"]
     resources: ["predictiveautoscalers/status"]
     verbs: ["get", "update", "patch"]
   

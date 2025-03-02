@@ -1,5 +1,5 @@
 ---
-apiVersion: scaler.cs.columbia.edu/v1
+apiVersion: scaler.cs.usc.edu/v1
 kind: PredictiveAutoscaler
 metadata:
   name: simpleweb-predictor
