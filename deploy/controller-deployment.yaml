@@ -15,7 +15,7 @@ spec:
       serviceAccountName: predictive-autoscaler-sa
       containers:
       - name: controller
-        image: ${YOUR_REGISTRY}/predictive-autoscaler:latest
+        image: anirudhr120100/csci555-predictive-autoscaler:latest
         resources:
           requests:
             memory: "128Mi"
