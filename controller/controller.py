@@ -67,21 +67,51 @@ def get_historical_pod_count_at_time(data, time_offset_minutes=0):
     now = datetime.datetime.now(datetime.timezone.utc)
     target_time = now - datetime.timedelta(minutes=time_offset_minutes)
     
-    # Find the closest historical data point
+    # Find the closest historical data point - floor to 5-minute interval
     target_hour = target_time.hour
-    target_minute = (target_time.minute // 5) * 5  # Round to nearest 5 minutes
+    target_minute = (target_time.minute // 5) * 5  # Floor to nearest 5-minute interval
     
+    # Create target timestamp in HH:MM format
+    target_timestamp = f"{target_hour:02d}:{target_minute:02d}"
+    logger.info(f"Looking for historical data at {target_timestamp}")
+    
+    # First try to find exact match
     for entry in data["data"]:
-        timestamp = datetime.datetime.fromisoformat(entry["timestamp"].replace("Z", "+00:00"))
-        if timestamp.hour == target_hour and timestamp.minute == target_minute:
+        if entry["timestamp"] == target_timestamp:
+            logger.info(f"Found exact match for {target_timestamp} with pod count {entry['podCount']}")
             return entry["podCount"]
     
+    # If exact match not found, find closest timestamp that's earlier
+    # Convert target to minutes since midnight for easy comparison
+    target_minutes = target_hour * 60 + target_minute
+    
+    closest_entry = None
+    closest_diff = float('inf')
+    
+    for entry in data["data"]:
+        # Parse HH:MM format
+        h, m = map(int, entry["timestamp"].split(':'))
+        entry_minutes = h * 60 + m
+        
+        # Only consider earlier timestamps
+        if entry_minutes <= target_minutes:
+            diff = target_minutes - entry_minutes
+            if diff < closest_diff:
+                closest_diff = diff
+                closest_entry = entry
+    
+    if closest_entry:
+        logger.info(f"Found closest earlier timestamp {closest_entry['timestamp']} with pod count {closest_entry['podCount']}")
+        return closest_entry["podCount"]
+    
     # Default if not found
+    logger.info(f"No historical data found for {target_timestamp}, using default pod count 1")
     return 1
 
 def update_historical_data(data, current_pods, historical_weight=0.7, current_weight=0.3):
     now = datetime.datetime.now(datetime.timezone.utc)
-    timestamp = now.replace(minute=(now.minute // 5) * 5, second=0, microsecond=0).isoformat().replace("+00:00", "Z")
+    # Format timestamp as HH:MM
+    timestamp = f"{now.hour:02d}:{(now.minute // 5) * 5:02d}"
     
     # Find if we have an entry for this timestamp
     for entry in data["data"]:
@@ -94,18 +124,26 @@ def update_historical_data(data, current_pods, historical_weight=0.7, current_we
     else:
         # No entry found, create new one
         data["data"].append({"timestamp": timestamp, "podCount": current_pods})
+        logger.info(f"Created new historical data entry for timestamp {timestamp} with pod count {current_pods}")
     
-    # Sort by timestamp
-    data["data"] = sorted(data["data"], key=lambda x: x["timestamp"])
+    # Sort by timestamp - for HH:MM format 
+    # Convert to minutes for proper sorting
+    def timestamp_to_minutes(ts):
+        h, m = map(int, ts.split(':'))
+        return h * 60 + m
+    
+    data["data"] = sorted(data["data"], key=lambda x: timestamp_to_minutes(x["timestamp"]))
     
     return data
 
 def prune_old_data(data, retention_days=7):
-    cutoff_date = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=retention_days)
-    cutoff_timestamp = cutoff_date.isoformat().replace("+00:00", "Z")
+    # Since we're using simplified timestamps without dates, 
+    # we can't easily prune by date anymore
+    # This function could be modified to keep a maximum number of entries
+    # or all entries could be kept since they're just HH:MM timestamps
     
-    data["data"] = [entry for entry in data["data"] if entry["timestamp"] >= cutoff_timestamp]
-    logger.info(f"Pruned historical data to {data['data']}")
+    # For now, we'll keep all entries since the set is limited (288 entries for a day)
+    logger.info(f"Historical data has {len(data['data'])} entries")
     return data
 
 def calculate_required_pods(current_pods, historical_data, max_replicas, prediction_window_minutes=10):
@@ -148,6 +186,10 @@ def update_hpa(namespace, hpa_name, min_replicas):
 
 def update_status(namespace, name, status_data):
     try:
+        # Format the lastUpdated timestamp in a more readable format
+        if "lastUpdated" in status_data:
+            status_data["lastUpdated"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        
         custom_api.patch_namespaced_custom_object_status(
             GROUP, VERSION, namespace, PLURAL, name, 
             {"status": status_data}
@@ -173,11 +215,12 @@ def create_fn(spec, name, namespace, logger, **kwargs):
     current_pods = get_current_pod_count(namespace, target_deployment)
     
     if current_pods > 0:
-        # Add initial entry
+        # Add initial entry with HH:MM format
         now = datetime.datetime.now(datetime.timezone.utc)
-        timestamp = now.replace(minute=(now.minute // 5) * 5, second=0, microsecond=0).isoformat().replace("+00:00", "Z")
+        timestamp = f"{now.hour:02d}:{(now.minute // 5) * 5:02d}"
         historical_data["data"].append({"timestamp": timestamp, "podCount": current_pods})
         save_historical_data(historical_data, namespace, name)
+        logger.info(f"Initialized historical data with timestamp {timestamp} and pod count {current_pods}")
     
     # Setup recurring job
     def recurring_update():
