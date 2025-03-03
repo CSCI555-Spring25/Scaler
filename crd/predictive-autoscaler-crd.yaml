@@ -58,6 +58,15 @@ spec:
                   type: integer
                 lastError:
                   type: string
+                create_fn:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                update_fn:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                delete_fn:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
       subresources:
         status: {}
   scope: Namespaced

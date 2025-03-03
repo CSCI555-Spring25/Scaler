@@ -6,6 +6,7 @@ import json
 import datetime
 import time
 import threading
+import logging
 
 # Load Kubernetes configuration
 kubernetes.config.load_incluster_config()
@@ -21,6 +22,9 @@ DATA_DIR = "/data"
 GROUP = "scaler.cs.usc.edu"
 VERSION = "v1"
 PLURAL = "predictiveautoscalers"
+
+logger = logging.getLogger(__name__)
+thread_logger = logging.getLogger(f"{__name__}.thread")
 
 def ensure_data_dir():
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -55,7 +59,7 @@ def get_current_pod_count(namespace, deployment_name):
         return deployment.status.replicas or 0
     except kubernetes.client.exceptions.ApiException as e:
         if e.status == 404:
-            kopf.info(f"Deployment {deployment_name} not found in namespace {namespace}", reason="Deployment Not Found")
+            logger.info(f"Deployment {deployment_name} not found in namespace {namespace}")
             return 0
         raise
 
@@ -110,14 +114,17 @@ def calculate_required_pods(current_pods, historical_data, max_replicas, predict
         
     # Get historical pod count 10 minutes ahead (negative because we're looking ahead)
     historical_pods_ahead = get_historical_pod_count_at_time(historical_data, -prediction_window_minutes)
-    
+    thread_logger.info(f"Historical data retrieved - historical pods now: {historical_pods_now}, historical pods ahead: {historical_pods_ahead}")
+
     # Calculate required pods using the formula
     ratio = current_pods / historical_pods_now
+    thread_logger.info(f"Ratio calculated: {ratio} (current pods: {current_pods}, historical pods now: {historical_pods_now})")
     required_pods = ratio * historical_pods_ahead
     
     # Ensure it's within limits and an integer
     required_pods = min(int(required_pods), max_replicas)
     required_pods = max(required_pods, 1)
+    thread_logger.info(f"Required pods calculated: {required_pods}")
     
     return required_pods
 
@@ -131,10 +138,10 @@ def update_hpa(namespace, hpa_name, min_replicas):
             namespace=namespace, 
             body={"spec": {"minReplicas": min_replicas}}
         )
-        kopf.info(f"Updated HPA {hpa_name} minReplicas to {min_replicas}", reason="HPA Update") 
+        thread_logger.info(f"Updated HPA {hpa_name} minReplicas to {min_replicas}")
         return True
     except kubernetes.client.exceptions.ApiException as e: 
-        kopf.exception(f"Failed to update HPA {hpa_name}: {e}")
+        thread_logger.exception(f"Failed to update HPA {hpa_name}: {e}")
         return False
 
 def update_status(namespace, name, status_data):
@@ -144,7 +151,7 @@ def update_status(namespace, name, status_data):
             {"status": status_data}
         )
     except kubernetes.client.exceptions.ApiException as e:
-        kopf.exception(f"Failed to update status: {e}")
+        thread_logger.exception(f"Failed to update status: {e}")
 
 # Dictionary to track running timers
 timers = {}
@@ -173,7 +180,7 @@ def create_fn(spec, name, namespace, logger, **kwargs):
     # Setup recurring job
     def recurring_update():
         if not check_if_cr_exists(namespace, name):
-            logger.info(f"PredictiveAutoscaler {name} no longer exists, stopping timer")
+            thread_logger.info(f"PredictiveAutoscaler {name} no longer exists, stopping timer")
             if f"{namespace}_{name}" in timers:
                 timers[f"{namespace}_{name}"].cancel()
                 del timers[f"{namespace}_{name}"]
@@ -198,7 +205,7 @@ def create_fn(spec, name, namespace, logger, **kwargs):
             
             # Get current pod count
             current_pods = get_current_pod_count(namespace, target_deployment)
-            logger.info(f"Current pod count for {target_deployment}: {current_pods}")
+            thread_logger.info(f"Current pod count for {target_deployment}: {current_pods}")
             
             # Load historical data
             historical_data = load_historical_data(namespace, name)
@@ -207,7 +214,7 @@ def create_fn(spec, name, namespace, logger, **kwargs):
                 # Calculate required pods
                 required_pods = calculate_required_pods(
                     current_pods, historical_data, max_replicas, prediction_window_minutes)
-                logger.info(f"Required pods for next {prediction_window_minutes} minutes: {required_pods}")
+                thread_logger.info(f"Required pods for next {prediction_window_minutes} minutes: {required_pods}")
                 
                 # Update HPA
                 success = update_hpa(namespace, target_hpa, required_pods)
@@ -217,7 +224,7 @@ def create_fn(spec, name, namespace, logger, **kwargs):
                     historical_data, current_pods, historical_weight, current_weight)
                 updated_data = prune_old_data(updated_data, history_retention_days)
                 save_historical_data(updated_data, namespace, name)
-                logger.info("Updated historical data")
+                thread_logger.info("Updated historical data")
                 
                 # Update status
                 status_data = {
@@ -226,7 +233,7 @@ def create_fn(spec, name, namespace, logger, **kwargs):
                 }
                 update_status(namespace, name, status_data)
             else:
-                logger.warning(f"Deployment {target_deployment} has 0 pods, skipping update")
+                thread_logger.warning(f"Deployment {target_deployment} has 0 pods, skipping update")
                 # Update status
                 status_data = {
                     "lastUpdated": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -241,7 +248,7 @@ def create_fn(spec, name, namespace, logger, **kwargs):
             timer.start()
             
         except Exception as e:
-            logger.exception(f"Error in recurring update: {e}")
+            thread_logger.exception(f"Error in recurring update: {e}")
             # Update status with error
             status_data = {
                 "lastUpdated": datetime.datetime.now(datetime.timezone.utc).isoformat(),
