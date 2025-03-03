@@ -55,7 +55,7 @@ def get_current_pod_count(namespace, deployment_name):
         return deployment.status.replicas or 0
     except kubernetes.client.exceptions.ApiException as e:
         if e.status == 404:
-            kopf.info(f"Deployment {deployment_name} not found in namespace {namespace}")
+            kopf.info(f"Deployment {deployment_name} not found in namespace {namespace}", reason="Deployment Not Found")
             return 0
         raise
 
@@ -131,8 +131,7 @@ def update_hpa(namespace, hpa_name, min_replicas):
             namespace=namespace, 
             body={"spec": {"minReplicas": min_replicas}}
         )
-         
-        kopf.info(f"Updated HPA {hpa_name} minReplicas to {min_replicas}") 
+        kopf.info(f"Updated HPA {hpa_name} minReplicas to {min_replicas}", reason="HPA Update") 
         return True
     except kubernetes.client.exceptions.ApiException as e: 
         kopf.exception(f"Failed to update HPA {hpa_name}: {e}")
