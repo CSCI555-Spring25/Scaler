@@ -89,6 +89,7 @@ def update_historical_data(data, current_pods, historical_weight=0.7, current_we
             historical_count = entry["podCount"]
             # Update using the given formula
             entry["podCount"] = int(historical_weight * historical_count + current_weight * current_pods)
+            logger.info(f"Updated historical data for timestamp {timestamp} to {entry['podCount']}")
             break
     else:
         # No entry found, create new one
@@ -104,6 +105,7 @@ def prune_old_data(data, retention_days=7):
     cutoff_timestamp = cutoff_date.isoformat().replace("+00:00", "Z")
     
     data["data"] = [entry for entry in data["data"] if entry["timestamp"] >= cutoff_timestamp]
+    logger.info(f"Pruned historical data to {data['data']}")
     return data
 
 def calculate_required_pods(current_pods, historical_data, max_replicas, prediction_window_minutes=10):
@@ -224,7 +226,7 @@ def create_fn(spec, name, namespace, logger, **kwargs):
                     historical_data, current_pods, historical_weight, current_weight)
                 updated_data = prune_old_data(updated_data, history_retention_days)
                 save_historical_data(updated_data, namespace, name)
-                thread_logger.info("Updated historical data")
+                thread_logger.info(f"Updated historical data to {updated_data}")
                 
                 # Update status
                 status_data = {
