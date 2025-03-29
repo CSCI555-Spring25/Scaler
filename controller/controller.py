@@ -8,10 +8,10 @@ import time
 import threading
 import logging
 
-# Load Kubernetes configuration
+# K8s config 
 kubernetes.config.load_incluster_config()
 
-# Initialize clients
+# Clients
 api_client = kubernetes.client.ApiClient()
 apps_api = kubernetes.client.AppsV1Api(api_client)
 autoscaling_api = kubernetes.client.AutoscalingV2Api(api_client)
@@ -30,7 +30,7 @@ def ensure_data_dir():
     os.makedirs(DATA_DIR, exist_ok=True)
 
 def get_history_file_path(namespace=None, name=None):
-    if not namespace and not name: #to be used for testing
+    if not namespace and not name:  
         return os.path.join(DATA_DIR, "realistic-traffic.json") 
     else:
         return os.path.join(DATA_DIR, f"{namespace}_{name}_history.json")
@@ -67,33 +67,28 @@ def get_historical_pod_count_at_time(data, time_offset_minutes=0):
     now = datetime.datetime.now(datetime.timezone.utc)
     target_time = now - datetime.timedelta(minutes=time_offset_minutes)
     
-    # Find the closest historical data point - floor to 5-minute interval
     target_hour = target_time.hour
-    target_minute = (target_time.minute // 5) * 5  # Floor to nearest 5-minute interval
+    target_minute = (target_time.minute // 5) * 5  # Floor to nearest 5-minute
     
-    # Create target timestamp in HH:MM format
+    # Target timestamp in HH:MM format
     target_timestamp = f"{target_hour:02d}:{target_minute:02d}"
     logger.info(f"Looking for historical data at {target_timestamp}")
     
-    # First try to find exact match
+    #Exact match check
     for entry in data["data"]:
         if entry["timestamp"] == target_timestamp:
             logger.info(f"Found exact match for {target_timestamp} with pod count {entry['podCount']}")
             return entry["podCount"]
     
-    # If exact match not found, find closest timestamp that's earlier
-    # Convert target to minutes since midnight for easy comparison
+    # If exact match not found, find closest timestamp that's earlier 
     target_minutes = target_hour * 60 + target_minute
     
     closest_entry = None
     closest_diff = float('inf')
     
-    for entry in data["data"]:
-        # Parse HH:MM format
+    for entry in data["data"]: 
         h, m = map(int, entry["timestamp"].split(':'))
         entry_minutes = h * 60 + m
-        
-        # Only consider earlier timestamps
         if entry_minutes <= target_minutes:
             diff = target_minutes - entry_minutes
             if diff < closest_diff:
@@ -104,30 +99,23 @@ def get_historical_pod_count_at_time(data, time_offset_minutes=0):
         logger.info(f"Found closest earlier timestamp {closest_entry['timestamp']} with pod count {closest_entry['podCount']}")
         return closest_entry["podCount"]
     
-    # Default if not found
     logger.info(f"No historical data found for {target_timestamp}, using default pod count 1")
     return 1
 
 def update_historical_data(data, current_pods, historical_weight=0.7, current_weight=0.3):
-    now = datetime.datetime.now(datetime.timezone.utc)
-    # Format timestamp as HH:MM
+    now = datetime.datetime.now(datetime.timezone.utc) 
     timestamp = f"{now.hour:02d}:{(now.minute // 5) * 5:02d}"
-    
-    # Find if we have an entry for this timestamp
+     
     for entry in data["data"]:
         if entry["timestamp"] == timestamp:
-            historical_count = entry["podCount"]
-            # Update using the given formula
+            historical_count = entry["podCount"] 
             entry["podCount"] = int(historical_weight * historical_count + current_weight * current_pods)
             logger.info(f"Updated historical data for timestamp {timestamp} to {entry['podCount']}")
             break
     else:
-        # No entry found, create new one
         data["data"].append({"timestamp": timestamp, "podCount": current_pods})
         logger.info(f"Created new historical data entry for timestamp {timestamp} with pod count {current_pods}")
-    
-    # Sort by timestamp - for HH:MM format 
-    # Convert to minutes for proper sorting
+     
     def timestamp_to_minutes(ts):
         h, m = map(int, ts.split(':'))
         return h * 60 + m
@@ -136,32 +124,24 @@ def update_historical_data(data, current_pods, historical_weight=0.7, current_we
     
     return data
 
-def prune_old_data(data, retention_days=7):
-    # Since we're using simplified timestamps without dates, 
-    # we can't easily prune by date anymore
-    # This function could be modified to keep a maximum number of entries
-    # or all entries could be kept since they're just HH:MM timestamps
-    
-    # For now, we'll keep all entries since the set is limited (288 entries for a day)
+def prune_old_data(data, retention_days=7): 
+    #Prune data older than retention_days
     logger.info(f"Historical data has {len(data['data'])} entries")
     return data
 
 def calculate_required_pods(current_pods, historical_data, max_replicas, prediction_window_minutes=10):
-    # Get historical pod count at current time
     historical_pods_now = get_historical_pod_count_at_time(historical_data, 0)
-    if historical_pods_now == 0:
-        historical_pods_now = 1  # Avoid division by zero
-        
-    # Get historical pod count 10 minutes ahead (negative because we're looking ahead)
-    historical_pods_ahead = get_historical_pod_count_at_time(historical_data, -prediction_window_minutes)
+    
+    if historical_pods_now == 0: # Divide by zero error fix
+        historical_pods_now = 1  
+         
+    historical_pods_ahead = get_historical_pod_count_at_time(historical_data, -prediction_window_minutes) # Buggy fix, Need to update function add offset
     thread_logger.info(f"Historical data retrieved - historical pods now: {historical_pods_now}, historical pods ahead: {historical_pods_ahead}")
-
-    # Calculate required pods using the formula
+ 
     ratio = current_pods / historical_pods_now
     thread_logger.info(f"Ratio calculated: {ratio} (current pods: {current_pods}, historical pods now: {historical_pods_now})")
     required_pods = ratio * historical_pods_ahead
-    
-    # Ensure it's within limits and an integer
+     
     required_pods = min(int(required_pods), max_replicas)
     required_pods = max(required_pods, 1)
     thread_logger.info(f"Required pods calculated: {required_pods}")
@@ -185,8 +165,7 @@ def update_hpa(namespace, hpa_name, min_replicas):
         return False
 
 def update_status(namespace, name, status_data):
-    try:
-        # Format the lastUpdated timestamp in a more readable format
+    try: 
         if "lastUpdated" in status_data:
             status_data["lastUpdated"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         
@@ -196,33 +175,29 @@ def update_status(namespace, name, status_data):
         )
     except kubernetes.client.exceptions.ApiException as e:
         thread_logger.exception(f"Failed to update status: {e}")
-
-# Dictionary to track running timers
+ 
 timers = {}
 
 @kopf.on.create('scaler.cs.usc.edu', 'v1', 'predictiveautoscalers')
 def create_fn(spec, name, namespace, logger, **kwargs):
     logger.info(f"Creating PredictiveAutoscaler {name} in namespace {namespace}")
     
-    # Extract configuration
+    # Configuration
     target_deployment = spec['targetDeployment']
     target_hpa = spec['targetHPA']
     max_replicas = spec['maxReplicas']
     update_interval = spec.get('updateInterval', 5)  # default 5 minutes
     
-    # Initialize historical data file if it doesn't exist
     historical_data = load_historical_data(namespace, name)
     current_pods = get_current_pod_count(namespace, target_deployment)
     
-    if current_pods > 0:
-        # Add initial entry with HH:MM format
+    if current_pods > 0: 
         now = datetime.datetime.now(datetime.timezone.utc)
         timestamp = f"{now.hour:02d}:{(now.minute // 5) * 5:02d}"
         historical_data["data"].append({"timestamp": timestamp, "podCount": current_pods})
         save_historical_data(historical_data, namespace, name)
         logger.info(f"Initialized historical data with timestamp {timestamp} and pod count {current_pods}")
-    
-    # Setup recurring job
+     
     def recurring_update():
         if not check_if_cr_exists(namespace, name):
             thread_logger.info(f"PredictiveAutoscaler {name} no longer exists, stopping timer")
@@ -231,14 +206,12 @@ def create_fn(spec, name, namespace, logger, **kwargs):
                 del timers[f"{namespace}_{name}"]
             return
         
-        try:
-            # Reload CR to get latest configuration
+        try: 
             cr = custom_api.get_namespaced_custom_object(
                 GROUP, VERSION, namespace, PLURAL, name
             )
             spec = cr.get('spec', {})
-            
-            # Extract latest configuration
+             
             target_deployment = spec['targetDeployment']
             target_hpa = spec['targetHPA']
             max_replicas = spec['maxReplicas']
@@ -247,16 +220,13 @@ def create_fn(spec, name, namespace, logger, **kwargs):
             history_retention_days = spec.get('historyRetentionDays', 7)
             prediction_window_minutes = spec.get('predictionWindowMinutes', 10)
             update_interval = spec.get('updateInterval', 5)
-            
-            # Get current pod count
+             
             current_pods = get_current_pod_count(namespace, target_deployment)
             thread_logger.info(f"Current pod count for {target_deployment}: {current_pods}")
-            
-            # Load historical data
+             
             historical_data = load_historical_data(namespace, name)
             
-            if current_pods > 0:
-                # Calculate required pods
+            if current_pods > 0: 
                 required_pods = calculate_required_pods(
                     current_pods, historical_data, max_replicas, prediction_window_minutes)
                 thread_logger.info(f"Required pods for next {prediction_window_minutes} minutes: {required_pods}")
@@ -270,8 +240,7 @@ def create_fn(spec, name, namespace, logger, **kwargs):
                 updated_data = prune_old_data(updated_data, history_retention_days)
                 save_historical_data(updated_data, namespace, name)
                 thread_logger.info(f"Updated historical data to {updated_data}")
-                
-                # Update status
+                 
                 status_data = {
                     "lastUpdated": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                     "currentPrediction": required_pods
@@ -279,35 +248,30 @@ def create_fn(spec, name, namespace, logger, **kwargs):
                 update_status(namespace, name, status_data)
             else:
                 thread_logger.warning(f"Deployment {target_deployment} has 0 pods, skipping update")
-                # Update status
                 status_data = {
                     "lastUpdated": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                     "lastError": "Deployment has 0 pods"
                 }
                 update_status(namespace, name, status_data)
-            
-            # Schedule next run
+             
             timer = threading.Timer(update_interval * 60, recurring_update)
             timer.daemon = True
             timers[f"{namespace}_{name}"] = timer
             timer.start()
             
         except Exception as e:
-            thread_logger.exception(f"Error in recurring update: {e}")
-            # Update status with error
+            thread_logger.exception(f"Error in recurring update: {e}") 
             status_data = {
                 "lastUpdated": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 "lastError": str(e)
             }
             update_status(namespace, name, status_data)
-            
-            # Still schedule next run despite error
+             
             timer = threading.Timer(update_interval * 60, recurring_update)
             timer.daemon = True
             timers[f"{namespace}_{name}"] = timer
             timer.start()
-    
-    # Start the first timer
+     
     timer = threading.Timer(update_interval * 60, recurring_update)
     timer.daemon = True
     timers[f"{namespace}_{name}"] = timer
@@ -329,8 +293,7 @@ def check_if_cr_exists(namespace, name):
 @kopf.on.delete('scaler.cs.usc.edu', 'v1', 'predictiveautoscalers')
 def delete_fn(spec, name, namespace, logger, **kwargs):
     logger.info(f"Deleting PredictiveAutoscaler {name} in namespace {namespace}")
-    
-    # Cancel timer if running
+     
     if f"{namespace}_{name}" in timers:
         timers[f"{namespace}_{name}"].cancel()
         del timers[f"{namespace}_{name}"]
@@ -343,17 +306,12 @@ def update_fn(spec, old, name, namespace, logger, **kwargs):
     if f"{namespace}_{name}" in timers:
         old_timer = timers[f"{namespace}_{name}"]
         old_timer.cancel()
-        
-        # Schedule immediate update
-        def immediate_update():
-            # Cancel existing timer first
+         
+        def immediate_update(): 
             if f"{namespace}_{name}" in timers:
-                timers[f"{namespace}_{name}"].cancel()
-            
-            # Get handler function from create_fn
+                timers[f"{namespace}_{name}"].cancel() 
             create_fn.__wrapped__(spec=spec, name=name, namespace=namespace, logger=logger)
-        
-        # Start immediate update
+
         timer = threading.Timer(0, immediate_update)
         timer.daemon = True
         timers[f"{namespace}_{name}"] = timer
