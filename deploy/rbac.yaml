@@ -1,0 +1,57 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: predictive-autoscaler-sa
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: predictive-autoscaler-role
+rules:
+  # Core API access
+  - apiGroups: [""]
+    resources: ["pods", "configmaps", "events", "namespaces", "services"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  
+  # Apps API access
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  
+  # Autoscaling API access
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  
+  # Custom Resources access for PredictiveAutoscalers
+  - apiGroups: ["scaler.cs.usc.edu"]
+    resources: ["predictiveautoscalers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["scaler.cs.usc.edu"]
+    resources: ["predictiveautoscalers/status"]
+    verbs: ["get", "update", "patch"]
+  
+  # API Extensions needed for CRD operations
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
+  
+  # Kopf-specific permissions for operators
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: predictive-autoscaler-role-binding
+subjects:
+  - kind: ServiceAccount
+    name: predictive-autoscaler-sa
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: predictive-autoscaler-role
+  apiGroup: rbac.authorization.k8s.io
+---
