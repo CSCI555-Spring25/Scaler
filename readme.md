@@ -63,3 +63,84 @@ or
 
 #### Check if the historical data is being updated
 `kubectl get predictiveautoscalers`
+
+
+# Kubernetes Cluster Deployment instructions on Cloudlab
+
+Cloudlabs has pre-existing profiles. Select the K8s
+
+1. Click Experiment -> Start experiment
+2. Click change profile
+3. Click on K8s profile from select window
+4. Click confirm and next to the parameterize page. 
+5. Make edits to the parameters(optional)
+6. Click next to the Finalize Page.
+-> Assign a name and cluster location
+7. Click next to the schedule page.
+8. Pick a time to deploy and click next
+
+Once the cluster starts, click "extend" to extend the cluster
+expiration by 7 days.
+
+## Starting K8s and docker on the cluster
+
+### SSH to node-0
+Click on the node in the node graph
+click on "Shell" from the pop-up menu
+
+### Install Docker
+#### Only do the following if docker is not installed.
+
+Dependencies:
+sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
+
+Docker GPG keys
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+Create the docker repository
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
+
+Install docker:
+sudo apt install -y docker-ce docker-ce-cli containerd.io
+
+Start docker
+sudo systemctl enable docker
+sudo systemctl start docker
+
+### Install Kubectl
+#### Only do the following if Kubernetes is not installed
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+kubectl version --client
+
+
+### Clone GitHub repo
+#### Git installation
+sudo apt install -y git
+
+#### Clone the repo
+git clone https://github.com/CSCI555-Spring25/Scaler.git
+
+
+### Building and registering docker container on the registry
+
+1. navigate to "webserver" folder
+2. Create docker container using "docker build -t simpleweb:latest ."
+3. Find the IP of the node/registry using the following command:
+    docker ps | grep "registry:2"
+4. If the local registry is not running, run the following to start the registry and go back to step 3: 
+    "docker run -d -p 5000:5000 --name registry registry:2"
+5. Once IP is known, for example 10.10.1.1
+Tag and push the docker container to the registry
+    docker tag simpleweb:latest 10.10.1.1:5000/simpleweb:latest
+    docker push 10.10.1.1:5000/simpleweb:latest
+6. If the ip address is not 10.10.1.1:5000, edit spec/template/spec/containers/image to have the correct IP address
+
+
+### Starting kubernetes service
+1. navigate to root directory of Scaler github repo
+2. Start the webserver with kubernetes:
+    kubectl apply -f echo-server.yaml
+3. Check status of the running pods with "kubectl get pods"
+
+

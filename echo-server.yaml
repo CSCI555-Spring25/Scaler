@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
       - name: simpleweb
-        image: simpleweb:latest
-        imagePullPolicy: Never
+        image: 10.10.1.1:5000/simpleweb:latest
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80
         resources:
