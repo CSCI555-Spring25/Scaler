@@ -149,5 +149,5 @@ If kubectl is giving an error while returning nodes, make sure there is a
 K8s profile for your user on cloud labs. Use following commands to 
 copy the admin profile into your user directory.
 
-sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-sudo chown $(id -u):$(id -g) $HOME/.kube/config
+`sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config`
+`sudo chown $(id -u):$(id -g) $HOME/.kube/config`
