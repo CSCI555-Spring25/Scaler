@@ -1,0 +1,11 @@
+2025-03-31 18:46:55,785 - Starting test: ab -n 100 -c 1 http://localhost:80/
+2025-03-31 18:46:55,840 - Metrics:
+Requests per second:    2355.88 [#/sec] (mean)
+Time per request:       0.424 [ms] (mean)
+Errors: 0
+2025-03-31 18:59:49,131 - Starting test: ab -n 100 -c 1 http://localhost:80/
+2025-03-31 18:59:49,187 - Test completed: ab -n 100 -c 1 http://localhost:80/
+2025-03-31 18:59:58,974 - Starting test: ab -n 100 -c 1 http://localhost:80/
+2025-03-31 18:59:59,030 - Test completed: ab -n 100 -c 1 http://localhost:80/
+2025-03-31 19:00:36,262 - Starting test: ab -n 100 -c 1 http://localhost:80/
+2025-03-31 19:00:36,317 - Test completed: ab -n 100 -c 1 http://localhost:80/
