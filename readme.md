@@ -125,23 +125,23 @@ Start docker
 ### Building and registering docker container on the registry
 
 1. navigate to "webserver" folder
-2. Create docker container using "docker build -t simpleweb:latest ."
-3. Find the IP of the node/registry using the following command:
-    docker ps | grep "registry:2"
+2. Create docker container using `docker build -t simpleweb:latest .`
+3. Find the IP of the node/registry using the following command: <br/>
+    `docker ps | grep "registry:2"`
 4. If the local registry is not running, run the following to start the registry and go back to step 3: 
-    "docker run -d -p 5000:5000 --name registry registry:2"
+    `docker run -d -p 5000:5000 --name registry registry:2`
 5. Once IP is known, for example 10.10.1.1
-Tag and push the docker container to the registry
-    docker tag simpleweb:latest 10.10.1.1:5000/simpleweb:latest
-    docker push 10.10.1.1:5000/simpleweb:latest
+Tag and push the docker container to the registry <br/>
+    `docker tag simpleweb:latest 10.10.1.1:5000/simpleweb:latest`
+    `docker push 10.10.1.1:5000/simpleweb:latest`
 6. If the ip address is not 10.10.1.1:5000, edit spec/template/spec/containers/image to have the correct IP address
 
 
 ### Starting kubernetes service
 1. navigate to root directory of Scaler github repo
 2. Start the webserver with kubernetes:
-    kubectl apply -f echo-server.yaml
-3. Check status of the running pods with "kubectl get pods"
+    `kubectl apply -f echo-server.yaml`
+3. Check status of the running pods with `kubectl get pods`
 
 
 # kubectl not returning nodes
