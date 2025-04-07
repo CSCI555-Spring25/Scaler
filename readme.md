@@ -92,34 +92,34 @@ click on "Shell" from the pop-up menu
 #### Only do the following if docker is not installed.
 
 Dependencies:
-sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
+`sudo apt install -y apt-transport-https ca-certificates curl software-properties-common`
 
 Docker GPG keys
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+`curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg`
 
 Create the docker repository
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
+`echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list`
 
 Install docker:
-sudo apt install -y docker-ce docker-ce-cli containerd.io
+`sudo apt install -y docker-ce docker-ce-cli containerd.io`
 
 Start docker
-sudo systemctl enable docker
-sudo systemctl start docker
+`sudo systemctl enable docker`
+`sudo systemctl start docker`
 
 ### Install Kubectl
 #### Only do the following if Kubernetes is not installed
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-kubectl version --client
+`curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"`
+`sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl`
+`kubectl version --client`
 
 
 ### Clone GitHub repo
 #### Git installation
-sudo apt install -y git
+`sudo apt install -y git`
 
 #### Clone the repo
-git clone https://github.com/CSCI555-Spring25/Scaler.git
+`git clone https://github.com/CSCI555-Spring25/Scaler.git`
 
 
 ### Building and registering docker container on the registry
