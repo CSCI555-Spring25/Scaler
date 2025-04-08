@@ -88,42 +88,58 @@ class HandlerClass(SimpleHTTPRequestHandler):
             0x8915,  # SIOCGIFADDR
             struct.pack('256s', ifname[:15])
         )[20:24])
-    def log_message(self, format, *args):
+
+    def do_GET(self):
+        """Handle GET requests by sending task information"""
         # Randomly add computational overhead to 20% of requests
+        task_executed = False
+        task_name = None
+        result = None
+        
         if random.random() < 0.5:
-            self.compute_intensive_task()
+            task_executed = True
+            tasks = {
+                self.compute_fibonacci: "Fibonacci",
+                self.compute_matrix_multiplication: "Matrix Multiplication",
+                self.find_large_primes: "Large Primes",
+                self.compute_string_permutations: "String Permutations"
+            }
+            chosen_task = random.choice(list(tasks.keys()))
+            task_name = tasks[chosen_task]
+            result = chosen_task()
             
-        if len(args) < 3 or "200" not in args[1]:
-            return
-        try:
-            request = pickle.load(open("pickle_data.txt","r"))
-        except:
-            request=OrderedDict()
+        # Create response content
         time_now = datetime.now()
         ts = time_now.strftime('%Y-%m-%d %H:%M:%S')
-        server = self.get_ip_address('eth0')
-        host=self.address_string()
-        addr_pair = (host,server)
-        if addr_pair not in request:
-            request[addr_pair]=[1,ts]
+        
+        response_lines = [
+            f"=== Request at {ts} ===",
+        ]
+        if task_executed:
+            response_lines.extend([
+                f"Compute-intensive task executed: {task_name}",
+                f"Result: {result}"
+            ])
         else:
-            num = request[addr_pair][0]+1
-            del request[addr_pair]
-            request[addr_pair]=[num,ts]
-        file=open("index.html", "w")
-        file.write("<!DOCTYPE html> <html> <body><center><h1><font color=\"blue\" face=\"Georgia, Arial\" size=8><em>Real</em></font> Visit Results</h1></center>");
-        for pair in request:
-            if pair[0] == host:
-                guest = "LOCAL: "+pair[0]
-            else:
-                guest = pair[0]
-            if (time_now-datetime.strptime(request[pair][1],'%Y-%m-%d %H:%M:%S')).seconds < 3:
-                file.write("<p style=\"font-size:150%\" >#"+ str(request[pair][1]) +": <font color=\"red\">"+str(request[pair][0])+ "</font> requests " + "from &lt<font color=\"blue\">"+guest+"</font>&gt to WebServer &lt<font color=\"blue\">"+pair[1]+"</font>&gt</p>")
-            else:
-                file.write("<p style=\"font-size:150%\" >#"+ str(request[pair][1]) +": <font color=\"maroon\">"+str(request[pair][0])+ "</font> requests " + "from &lt<font color=\"navy\">"+guest+"</font>&gt to WebServer &lt<font color=\"navy\">"+pair[1]+"</font>&gt</p>")
-        file.write("</body> </html>");
-        file.close()
-        pickle.dump(request,open("pickle_data.txt","w"))
+            response_lines.append("No compute-intensive task executed")
+        response_lines.append("=" * 40)
+        
+        response = "\n".join(response_lines)
+        
+        # Send response
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.send_header('Content-length', len(response))
+        self.end_headers()
+        self.wfile.write(response)
+        
+        # Also log to file
+        with open("server_log.txt", "a") as f:
+            f.write(response + "\n")
+
+    def log_message(self, format, *args):
+        # Override to suppress default logging
+        pass
 
 if __name__ == '__main__':
     try:
