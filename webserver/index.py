@@ -21,13 +21,13 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
             if n <= 1:
                 return n
             return fib(n-1) + fib(n-2)
-        n = random.randint(30, 950)
+        n = random.randint(30, 400)
         print(f"Executing Fibonacci task with n={n}")
         return fib(n)
 
     def compute_matrix_multiplication(self):
         # Create two large random matrices
-        size = random.randint(100, 2000)
+        size = random.randint(100, 1000)
         print(f"Executing Matrix Multiplication task with size={size}x{size}")
         matrix1 = [[random.random() for _ in range(size)] for _ in range(size)]
         matrix2 = [[random.random() for _ in range(size)] for _ in range(size)]
@@ -60,7 +60,7 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
 
     def compute_string_permutations(self):
         chars = 'abcdefghijklmnopqrstuvwxyz'
-        n = random.randint(8, 90)
+        n = random.randint(8, 30)
         print(f"Executing String Permutations task with string length={n}")
         s = ''.join(random.choices(chars, k=n))
         
@@ -86,55 +86,54 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         """Handle GET requests by sending task information"""
-        # Randomly add computational overhead to 20% of requests
-        task_executed = False
-        task_name = None
-        result = None
-        
-        if random.random() < 0.7:
-            task_executed = True
-            tasks = {
-                self.compute_fibonacci: "Fibonacci",
-                self.compute_matrix_multiplication: "Matrix Multiplication",
-                self.find_large_primes: "Large Primes",
-                self.compute_string_permutations: "String Permutations"
-            }
-            chosen_task = random.choice(list(tasks.keys()))
-            task_name = tasks[chosen_task]
-            result = chosen_task()
+        try:
+            task_executed = False
+            task_name = None
+            result = None
             
-        # Create response content
-        time_now = datetime.now()
-        ts = time_now.strftime('%Y-%m-%d %H:%M:%S')
-        
-        response_lines = [
-            f"=== Request at {ts} ===",
-        ]
-        if task_executed:
-            response_lines.extend([
-                f"Compute-intensive task executed: {task_name}",
-                f"Result: {result}"
-            ])
-        else:
-            response_lines.append("No compute-intensive task executed")
-        response_lines.append("=" * 40)
-        
-        response = "\n".join(response_lines)
-        
-        # Send response
-        self.send_response(200)
-        self.send_header('Content-type', 'text/plain')
-        self.send_header('Content-length', str(len(response)))
-        self.end_headers()
-        self.wfile.write(response.encode('utf-8'))
-        
-        # Also log to file
-        with open("server_log.txt", "a") as f:
-            f.write(response + "\n")
-
-    def log_message(self, format, *args):
-        # Override to suppress default logging
-        pass
+            if random.random() < 0.7:
+                task_executed = True
+                tasks = {
+                    self.compute_fibonacci: "Fibonacci",
+                    self.compute_matrix_multiplication: "Matrix Multiplication",
+                    self.find_large_primes: "Large Primes",
+                    self.compute_string_permutations: "String Permutations"
+                }
+                chosen_task = random.choice(list(tasks.keys()))
+                task_name = tasks[chosen_task]
+                result = chosen_task()
+                
+            # Create response content
+            time_now = datetime.now()
+            ts = time_now.strftime('%Y-%m-%d %H:%M:%S')
+            
+            response_lines = [
+                f"=== Request at {ts} ===",
+            ]
+            if task_executed:
+                response_lines.extend([
+                    f"Compute-intensive task executed: {task_name}",
+                    f"Result: {result}"
+                ])
+            else:
+                response_lines.append("No compute-intensive task executed")
+            response_lines.append("=" * 40)
+            
+            response = "\n".join(response_lines)
+            
+            # Send response
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.send_header('Content-length', str(len(response)))
+            self.end_headers()
+            self.wfile.write(response.encode('utf-8'))
+            
+            # Also log to file
+            with open("server_log.txt", "a") as f:
+                f.write(response + "\n")
+        except Exception as e:
+            print(f"Error: {e}")
+            self.close_connection = True
 
 if __name__ == '__main__':
     try:
