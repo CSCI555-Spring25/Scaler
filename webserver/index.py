@@ -1,10 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 #authors: yeasy.github.com
 #date: 2013-07-05
 
 import sys
-import BaseHTTPServer
-from SimpleHTTPServer import SimpleHTTPRequestHandler
+import http.server
 import socket
 import fcntl
 import struct
@@ -14,18 +13,18 @@ from collections import OrderedDict
 import random
 import math
 
-class HandlerClass(SimpleHTTPRequestHandler):
+class HandlerClass(http.server.SimpleHTTPRequestHandler):
     def compute_fibonacci(self):
         def fib(n):
             if n <= 1:
                 return n
             return fib(n-1) + fib(n-2)
-        n = random.randint(30, 35)
+        n = random.randint(30, 2000000)
         return fib(n)
 
     def compute_matrix_multiplication(self):
         # Create two large random matrices
-        size = random.randint(100, 150)
+        size = random.randint(100, 2000000)
         matrix1 = [[random.random() for _ in range(size)] for _ in range(size)]
         matrix2 = [[random.random() for _ in range(size)] for _ in range(size)]
         
@@ -47,7 +46,7 @@ class HandlerClass(SimpleHTTPRequestHandler):
             return True
 
         primes = []
-        num = random.randint(1000000, 2000000)
+        num = random.randint(1000, 2000000000)
         while len(primes) < 5:
             if is_prime(num):
                 primes.append(num)
@@ -56,7 +55,7 @@ class HandlerClass(SimpleHTTPRequestHandler):
 
     def compute_string_permutations(self):
         chars = 'abcdefghijklmnopqrstuvwxyz'
-        n = random.randint(8, 10)
+        n = random.randint(8, 20000)
         s = ''.join(random.choices(chars, k=n))
         
         def permute(s, l, r):
@@ -81,12 +80,12 @@ class HandlerClass(SimpleHTTPRequestHandler):
         ]
         return random.choice(tasks)()
 
-    def get_ip_address(self,ifname):
+    def get_ip_address(self, ifname):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         return socket.inet_ntoa(fcntl.ioctl(
             s.fileno(),
             0x8915,  # SIOCGIFADDR
-            struct.pack('256s', ifname[:15])
+            struct.pack('256s', ifname[:15].encode('utf-8'))
         )[20:24])
 
     def do_GET(self):
@@ -96,7 +95,7 @@ class HandlerClass(SimpleHTTPRequestHandler):
         task_name = None
         result = None
         
-        if random.random() < 0.5:
+        if random.random() < 0.7:
             task_executed = True
             tasks = {
                 self.compute_fibonacci: "Fibonacci",
@@ -129,9 +128,9 @@ class HandlerClass(SimpleHTTPRequestHandler):
         # Send response
         self.send_response(200)
         self.send_header('Content-type', 'text/plain')
-        self.send_header('Content-length', len(response))
+        self.send_header('Content-length', str(len(response)))
         self.end_headers()
-        self.wfile.write(response)
+        self.wfile.write(response.encode('utf-8'))
         
         # Also log to file
         with open("server_log.txt", "a") as f:
@@ -143,14 +142,14 @@ class HandlerClass(SimpleHTTPRequestHandler):
 
 if __name__ == '__main__':
     try:
-        ServerClass  = BaseHTTPServer.HTTPServer
-        Protocol     = "HTTP/1.0"
+        ServerClass = http.server.HTTPServer
+        Protocol = "HTTP/1.0"
         addr = len(sys.argv) < 2 and "0.0.0.0" or sys.argv[1]
         port = len(sys.argv) < 3 and 80 or int(sys.argv[2])
         HandlerClass.protocol_version = Protocol
         httpd = ServerClass((addr, port), HandlerClass)
         sa = httpd.socket.getsockname()
-        print "Serving HTTP on", sa[0], "port", sa[1], "..."
+        print("Serving HTTP on", sa[0], "port", sa[1], "...")
         httpd.serve_forever()
     except:
         exit()
