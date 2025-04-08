@@ -21,9 +21,10 @@ Build the Docker image
 `docker build -t predictive-autoscaler:latest .`
 
 Tag and push to your container registry
-`docker tag predictive-autoscaler:latest anirudhr120100/csci555-predictive-autoscaler:latest`
-
-`docker push anirudhr120100/csci555-predictive-autoscaler:latest`
+```sh
+    docker tag predictive-autoscaler:latest anirudhr120100/csci555-predictive-autoscaler:latest
+    docker push anirudhr120100/csci555-predictive-autoscaler:latest
+```
 
 ### Update the controller deployment with your image registry
 Edit /Scaler/deploy/controller-deployment.yaml 
@@ -70,10 +71,9 @@ or
 Cloudlabs has pre-existing profiles. Select the K8s
 
 1. Click Experiment -> Start experiment
-2. Click change profile
-3. Click on K8s profile from select window
+2. Change Profile to K8s profile from select window
 4. Click confirm and next to the parameterize page. 
-5. Make edits to the parameters(optional)
+5. Make edits to the parameters (optional)
 6. Click next to the Finalize Page.
 -> Assign a name and cluster location
 7. Click next to the schedule page.
@@ -92,56 +92,61 @@ click on "Shell" from the pop-up menu
 #### Only do the following if docker is not installed.
 
 Dependencies:
-sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
+`sudo apt install -y apt-transport-https ca-certificates curl software-properties-common`
 
 Docker GPG keys
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+`curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg`
 
 Create the docker repository
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
+`echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list`
 
 Install docker:
-sudo apt install -y docker-ce docker-ce-cli containerd.io
+`sudo apt install -y docker-ce docker-ce-cli containerd.io`
 
 Start docker
-sudo systemctl enable docker
-sudo systemctl start docker
+```sh
+    sudo systemctl enable docker
+    sudo systemctl start docker
+```
 
 ### Install Kubectl
 #### Only do the following if Kubernetes is not installed
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-kubectl version --client
+```sh
+    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+    kubectl version --client
+```
 
 
 ### Clone GitHub repo
 #### Git installation
-sudo apt install -y git
+`sudo apt install -y git`
 
 #### Clone the repo
-git clone https://github.com/CSCI555-Spring25/Scaler.git
+`git clone https://github.com/CSCI555-Spring25/Scaler.git`
 
 
 ### Building and registering docker container on the registry
 
 1. navigate to "webserver" folder
-2. Create docker container using "docker build -t simpleweb:latest ."
-3. Find the IP of the node/registry using the following command:
-    docker ps | grep "registry:2"
+2. Create docker container using `docker build -t simpleweb:latest .`
+3. Find the IP of the node/registry using the following command: <br/>
+    `docker ps | grep "registry:2"`
 4. If the local registry is not running, run the following to start the registry and go back to step 3: 
-    "docker run -d -p 5000:5000 --name registry registry:2"
+    `docker run -d -p 5000:5000 --name registry registry:2`
 5. Once IP is known, for example 10.10.1.1
-Tag and push the docker container to the registry
-    docker tag simpleweb:latest 10.10.1.1:5000/simpleweb:latest
-    docker push 10.10.1.1:5000/simpleweb:latest
+Tag and push the docker container to the registry 
+    ```sh
+        docker tag simpleweb:latest 10.10.1.1:5000/simpleweb:latest
+        docker push 10.10.1.1:5000/simpleweb:latest
+    ```
 6. If the ip address is not 10.10.1.1:5000, edit spec/template/spec/containers/image to have the correct IP address
 
 
 ### Starting kubernetes service
 1. navigate to root directory of Scaler github repo
-2. Start the webserver with kubernetes:
-    kubectl apply -f echo-server.yaml
-3. Check status of the running pods with "kubectl get pods"
+2. Start the webserver with kubernetes: `kubectl apply -f echo-server.yaml`
+3. Check status of the running pods with `kubectl get pods`
 
 
 # kubectl not returning nodes
@@ -149,5 +154,7 @@ If kubectl is giving an error while returning nodes, make sure there is a
 K8s profile for your user on cloud labs. Use following commands to 
 copy the admin profile into your user directory.
 
-sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-sudo chown $(id -u):$(id -g) $HOME/.kube/config
+```sh
+    sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+    sudo chown $(id -u):$(id -g) $HOME/.kube/config
+```
