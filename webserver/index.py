@@ -22,11 +22,13 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
                 return n
             return fib(n-1) + fib(n-2)
         n = random.randint(30, 950)
+        print(f"Executing Fibonacci task with n={n}")
         return fib(n)
 
     def compute_matrix_multiplication(self):
         # Create two large random matrices
         size = random.randint(100, 2000000)
+        print(f"Executing Matrix Multiplication task with size={size}x{size}")
         matrix1 = [[random.random() for _ in range(size)] for _ in range(size)]
         matrix2 = [[random.random() for _ in range(size)] for _ in range(size)]
         
@@ -49,6 +51,7 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
 
         primes = []
         num = random.randint(1000, 20000000)
+        print(f"Executing Large Primes task starting from {num}")
         while len(primes) < 5:
             if is_prime(num):
                 primes.append(num)
@@ -58,6 +61,7 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
     def compute_string_permutations(self):
         chars = 'abcdefghijklmnopqrstuvwxyz'
         n = random.randint(8, 200)
+        print(f"Executing String Permutations task with string length={n}")
         s = ''.join(random.choices(chars, k=n))
         
         def permute(s, l, r):
