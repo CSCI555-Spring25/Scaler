@@ -1,0 +1,88 @@
+2025-03-31 18:46:55,785 - Starting test: ab -n 100 -c 1 http://localhost:80/
+2025-03-31 18:46:55,840 - Metrics:
+Requests per second:    2355.88 [#/sec] (mean)
+Time per request:       0.424 [ms] (mean)
+Errors: 0
+2025-03-31 18:59:49,131 - Starting test: ab -n 100 -c 1 http://localhost:80/
+2025-03-31 18:59:49,187 - Test completed: ab -n 100 -c 1 http://localhost:80/
+2025-03-31 18:59:58,974 - Starting test: ab -n 100 -c 1 http://localhost:80/
+2025-03-31 18:59:59,030 - Test completed: ab -n 100 -c 1 http://localhost:80/
+2025-03-31 19:00:36,262 - Starting test: ab -n 100 -c 1 http://localhost:80/
+2025-03-31 19:00:36,317 - Test completed: ab -n 100 -c 1 http://localhost:80/
+2025-04-07 23:45:14,036 - Starting test: ab -n 100 -c 1 http://localhost:80/
+2025-04-07 23:45:14,085 - Test completed: ab -n 100 -c 1 http://localhost:80/
+2025-04-07 23:46:27,758 - Starting test: ab -n 100 -c 1 http://localhost:80/
+2025-04-07 23:46:27,795 - Test completed: ab -n 100 -c 1 http://localhost:80/
+2025-04-07 23:47:57,317 - Starting test: ab -n 100 -c 1 http://localhost:80/
+2025-04-07 23:47:57,363 - Test completed: ab -n 100 -c 1 http://localhost:80/
+2025-04-07 23:48:23,624 - Starting test: ab -n 100 -c 1 http://localhost:80/
+2025-04-07 23:48:23,669 - Test completed: ab -n 100 -c 1 http://localhost:80/
+2025-04-07 23:48:37,889 - Starting test: ab -n 100 -c 1 http://localhost:80/
+2025-04-07 23:48:37,934 - Test completed: ab -n 100 -c 1 http://localhost:80/
+2025-04-07 23:48:54,259 - Starting test: ab -n 100 -c 1 http://localhost:80/
+2025-04-07 23:48:54,304 - Test completed: ab -n 100 -c 1 http://localhost:80/
+2025-04-07 23:50:28,076 - Starting test: ab -n 1000 -c 100 http://localhost:80/
+2025-04-07 23:50:28,248 - Test completed: ab -n 1000 -c 100 http://localhost:80/
+2025-04-07 23:51:14,080 - Starting test: ab -n 1000 -c 100 http://localhost:80/
+2025-04-07 23:51:14,249 - Test completed: ab -n 1000 -c 100 http://localhost:80/
+2025-04-07 23:51:37,362 - Starting test: ab -n 10000 -c 1000 http://localhost:80/
+2025-04-07 23:51:38,776 - Test completed: ab -n 10000 -c 1000 http://localhost:80/
+2025-04-07 23:52:15,081 - Starting test: ab -n 100000 -c 10000 http://localhost:80/
+2025-04-07 23:52:25,985 - Test completed: ab -n 100000 -c 10000 http://localhost:80/
+2025-04-07 23:53:17,676 - Starting test: ab -n 100000 -c 1000 http://localhost:80/
+2025-04-07 23:53:30,046 - Test completed: ab -n 100000 -c 1000 http://localhost:80/
+2025-04-07 23:53:38,305 - Starting test: ab -n 100000 -c 100 http://localhost:80/
+2025-04-07 23:53:50,622 - Test completed: ab -n 100000 -c 100 http://localhost:80/
+2025-04-07 23:54:22,941 - Starting test: ab -n 1000000 -c 100 http://localhost:80/
+2025-04-07 23:56:32,641 - Starting test: ab -n 1000000 -c 10000 http://localhost:80/
+2025-04-07 23:58:13,336 - Test completed: ab -n 1000000 -c 10000 http://localhost:80/
+2025-04-07 23:59:50,016 - Starting test: ab -n 1000000 -c 100000 http://localhost:80/
+2025-04-07 23:59:50,021 - Test failed: ab: Invalid Concurrency [Range 0..20000]
+Usage: ab [options] [http[s]://]hostname[:port]/path
+Options are:
+    -n requests     Number of requests to perform
+    -c concurrency  Number of multiple requests to make at a time
+    -t timelimit    Seconds to max. to spend on benchmarking
+                    This implies -n 50000
+    -s timeout      Seconds to max. wait for each response
+                    Default is 30 seconds
+    -b windowsize   Size of TCP send/receive buffer, in bytes
+    -B address      Address to bind to when making outgoing connections
+    -p postfile     File containing data to POST. Remember also to set -T
+    -u putfile      File containing data to PUT. Remember also to set -T
+    -T content-type Content-type header to use for POST/PUT data, eg.
+                    'application/x-www-form-urlencoded'
+                    Default is 'text/plain'
+    -v verbosity    How much troubleshooting info to print
+    -w              Print out results in HTML tables
+    -i              Use HEAD instead of GET
+    -x attributes   String to insert as table attributes
+    -y attributes   String to insert as tr attributes
+    -z attributes   String to insert as td or th attributes
+    -C attribute    Add cookie, eg. 'Apache=1234'. (repeatable)
+    -H attribute    Add Arbitrary header line, eg. 'Accept-Encoding: gzip'
+                    Inserted after all normal header lines. (repeatable)
+    -A attribute    Add Basic WWW Authentication, the attributes
+                    are a colon separated username and password.
+    -P attribute    Add Basic Proxy Authentication, the attributes
+                    are a colon separated username and password.
+    -X proxy:port   Proxyserver and port number to use
+    -V              Print version number and exit
+    -k              Use HTTP KeepAlive feature
+    -d              Do not show percentiles served table.
+    -S              Do not show confidence estimators and warnings.
+    -q              Do not show progress when doing more than 150 requests
+    -l              Accept variable document length (use this for dynamic pages)
+    -g filename     Output collected data to gnuplot format file.
+    -e filename     Output CSV file with percentages served
+    -r              Don't exit on socket receive errors.
+    -m method       Method name
+    -h              Display usage information (this message)
+    -I              Disable TLS Server Name Indication (SNI) extension
+    -Z ciphersuite  Specify SSL/TLS cipher suite (See openssl ciphers)
+    -f protocol     Specify SSL/TLS protocol
+                    (SSL2, TLS1, TLS1.1, TLS1.2 or ALL)
+    -E certfile     Specify optional client certificate chain and private key
+
+2025-04-08 00:00:16,385 - Starting test: ab -n 1000000 -c 20000 http://localhost:80/
+2025-04-08 00:05:16,399 - Unexpected error: Command 'ab -n 1000000 -c 20000 http://localhost:80/' timed out after 300 seconds
