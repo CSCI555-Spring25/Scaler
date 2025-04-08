@@ -4,13 +4,6 @@ This repository contains a set of tools for implementing and testing proactive s
 
 ## Components
 
-### 1. Proactive Scaler (`proactive_scaler.py`)
-A predictive scaling service that:
-- Analyzes historical request patterns
-- Calculates optimal pod counts based on past data
-- Proactively scales deployments before load increases
-- Runs every 5 minutes to adjust pod counts
-
 ### 2. Load Tester (`load_tester.py`)
 A realistic load generation tool that:
 - Simulates daily traffic patterns using a Gaussian distribution
@@ -50,10 +43,6 @@ A monitoring script that:
    - Adjust `MAX_REQUESTS` and `PEAK_HOUR` in `load_tester.py`
    - Modify `max_pods` in `proactive_scaler.py` if needed
 
-3. Deploy your application:
-   ```bash
-   kubectl apply -f your-deployment.yaml
-   ```
 
 ## Usage
 
@@ -68,10 +57,6 @@ A monitoring script that:
    python load_tester.py
    ```
 
-3. Start the proactive scaler:
-   ```bash
-   python proactive_scaler.py
-   ```
 
 ## Data Files
 

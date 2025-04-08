@@ -22,5 +22,6 @@ while true; do
         echo "$timestamp,$line" >> $NODE_FILE
     done
     
-    sleep 60
+    echo "Sleeping 5"
+    sleep 5
 done

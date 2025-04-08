@@ -11,11 +11,12 @@ import os
 # Configuration
 PEAK_HOUR = 18  # 6 PM
 SIGMA_MINUTES = 60  # 1 hour standard deviation
-MAX_REQUESTS = 100  # Peak requests
-ABSOLUTE_MAX_REQUESTS = 150  # Absolute max requests
+MAX_REQUESTS = 1_000_000  # Peak requests
+ABSOLUTE_MAX_REQUESTS = 1500  # Absolute max requests
 INTERVAL_MINUTES = 5  # Run test every 5 minutes
 HISTORICAL_DATA_FILE = "historical_data.csv"
 LOAD_TEST_LOG = "load_test.log"
+OVERIDE = True
 
 HOST_URL = "http://localhost:80"
 HOST_ENDPOINT = "/" # requires at least / for ab testing cmd
@@ -169,6 +170,12 @@ def run_ab_test():
     concurrency = max(requests // 100, 1)
     
     cmd = f"ab -n {requests} -c {concurrency} {HOST_URL}{HOST_ENDPOINT}"
+    if OVERIDE:
+        requests = MAX_REQUESTS
+        concurrency = 20_000
+        cmd = f"ab -n {requests} -c {concurrency} {HOST_URL}{HOST_ENDPOINT}"
+
+
     logging.info(f"Starting test: {cmd}")
     print(f"Starting test: {cmd}")
     
@@ -206,6 +213,7 @@ def run_ab_test():
             writer.writerow(row)
         
         logging.info(f"Test completed: {cmd}")
+        print(f"Test completed: {cmd}")
     except subprocess.CalledProcessError as e:
         logging.error(f"Test failed: {e.stderr}")
     except Exception as e:
