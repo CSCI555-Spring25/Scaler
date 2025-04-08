@@ -27,7 +27,7 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
 
     def compute_matrix_multiplication(self):
         # Create two large random matrices
-        size = random.randint(100, 2000)
+        size = random.randint(100, 200)
         print(f"Executing Matrix Multiplication task with size={size}x{size}")
         matrix1 = [[random.random() for _ in range(size)] for _ in range(size)]
         matrix2 = [[random.random() for _ in range(size)] for _ in range(size)]
@@ -60,7 +60,7 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
 
     def compute_string_permutations(self):
         chars = 'abcdefghijklmnopqrstuvwxyz'
-        n = random.randint(8, 90)
+        n = random.randint(8, 9)
         print(f"Executing String Permutations task with string length={n}")
         s = ''.join(random.choices(chars, k=n))
         

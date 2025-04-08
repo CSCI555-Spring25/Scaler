@@ -3,5 +3,5 @@ EXPOSE 80
 WORKDIR /code
 ADD . /code
 RUN touch index.html
-CMD python3 index.py
+CMD python3 -u index.py
 
