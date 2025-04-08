@@ -50,7 +50,7 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
             return True
 
         primes = []
-        num = random.randint(1000, 20000000)
+        num = random.randint(1000, 20000)
         print(f"Executing Large Primes task starting from {num}")
         while len(primes) < 5:
             if is_prime(num):
