@@ -11,8 +11,76 @@ import struct
 import pickle
 from datetime import datetime
 from collections import OrderedDict
+import random
+import math
 
 class HandlerClass(SimpleHTTPRequestHandler):
+    def compute_fibonacci(self):
+        def fib(n):
+            if n <= 1:
+                return n
+            return fib(n-1) + fib(n-2)
+        n = random.randint(30, 35)
+        return fib(n)
+
+    def compute_matrix_multiplication(self):
+        # Create two large random matrices
+        size = random.randint(100, 150)
+        matrix1 = [[random.random() for _ in range(size)] for _ in range(size)]
+        matrix2 = [[random.random() for _ in range(size)] for _ in range(size)]
+        
+        # Perform matrix multiplication using pure Python
+        result = [[0 for _ in range(size)] for _ in range(size)]
+        for i in range(size):
+            for j in range(size):
+                for k in range(size):
+                    result[i][j] += matrix1[i][k] * matrix2[k][j]
+        return result
+
+    def find_large_primes(self):
+        def is_prime(n):
+            if n < 2:
+                return False
+            for i in range(2, int(math.sqrt(n)) + 1):
+                if n % i == 0:
+                    return False
+            return True
+
+        primes = []
+        num = random.randint(1000000, 2000000)
+        while len(primes) < 5:
+            if is_prime(num):
+                primes.append(num)
+            num += 1
+        return primes
+
+    def compute_string_permutations(self):
+        chars = 'abcdefghijklmnopqrstuvwxyz'
+        n = random.randint(8, 10)
+        s = ''.join(random.choices(chars, k=n))
+        
+        def permute(s, l, r):
+            if l == r:
+                return
+            for i in range(l, r + 1):
+                s[l], s[i] = s[i], s[l]
+                permute(s, l + 1, r)
+                s[l], s[i] = s[i], s[l]
+        
+        s_list = list(s)
+        permute(s_list, 0, len(s_list) - 1)
+        return s
+
+    def compute_intensive_task(self):
+        # Randomly select one of the compute-intensive tasks
+        tasks = [
+            self.compute_fibonacci,
+            self.compute_matrix_multiplication,
+            self.find_large_primes,
+            self.compute_string_permutations
+        ]
+        return random.choice(tasks)()
+
     def get_ip_address(self,ifname):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         return socket.inet_ntoa(fcntl.ioctl(
@@ -21,6 +89,10 @@ class HandlerClass(SimpleHTTPRequestHandler):
             struct.pack('256s', ifname[:15])
         )[20:24])
     def log_message(self, format, *args):
+        # Randomly add computational overhead to 20% of requests
+        if random.random() < 0.5:
+            self.compute_intensive_task()
+            
         if len(args) < 3 or "200" not in args[1]:
             return
         try:
