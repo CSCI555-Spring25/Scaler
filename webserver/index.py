@@ -12,14 +12,16 @@ from datetime import datetime
 from collections import OrderedDict
 import random
 import math
+from functools import lru_cache
 
 class HandlerClass(http.server.SimpleHTTPRequestHandler):
     def compute_fibonacci(self):
+        @lru_cache(maxsize=None)
         def fib(n):
             if n <= 1:
                 return n
             return fib(n-1) + fib(n-2)
-        n = random.randint(30, 2000000)
+        n = random.randint(30, 20000)
         return fib(n)
 
     def compute_matrix_multiplication(self):
@@ -46,7 +48,7 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
             return True
 
         primes = []
-        num = random.randint(1000, 2000000000)
+        num = random.randint(1000, 20000000)
         while len(primes) < 5:
             if is_prime(num):
                 primes.append(num)
@@ -55,7 +57,7 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
 
     def compute_string_permutations(self):
         chars = 'abcdefghijklmnopqrstuvwxyz'
-        n = random.randint(8, 20000)
+        n = random.randint(8, 200)
         s = ''.join(random.choices(chars, k=n))
         
         def permute(s, l, r):
@@ -69,16 +71,6 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
         s_list = list(s)
         permute(s_list, 0, len(s_list) - 1)
         return s
-
-    def compute_intensive_task(self):
-        # Randomly select one of the compute-intensive tasks
-        tasks = [
-            self.compute_fibonacci,
-            self.compute_matrix_multiplication,
-            self.find_large_primes,
-            self.compute_string_permutations
-        ]
-        return random.choice(tasks)()
 
     def get_ip_address(self, ifname):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
