@@ -142,7 +142,8 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
                 
         except Exception as e:
             print(f"Error: {e}")
-            self.close_connection = True
+            return
+            # self.close_connection = True
 
     def handle(self):
         """Handle a single HTTP request"""
@@ -154,6 +155,7 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
             return
         except Exception as e:
             print(f"Error handling request: {e}")
+            return
             self.close_connection = True
 
 if __name__ == '__main__':
@@ -165,7 +167,7 @@ if __name__ == '__main__':
         HandlerClass.protocol_version = Protocol
         httpd = ServerClass((addr, port), HandlerClass)
         sa = httpd.socket.getsockname()
-        print("Serving HTTP on", sa[0], "port", sa[1], "...")
+        # print("Serving HTTP on", sa[0], "port", sa[1], "...")
         httpd.serve_forever()
     except:
         exit()
