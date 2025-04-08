@@ -128,13 +128,32 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
             self.send_header('Content-type', 'text/plain')
             self.send_header('Content-length', str(len(response)))
             self.end_headers()
-            self.wfile.write(response.encode('utf-8'))
+            
+            try:
+                self.wfile.write(response.encode('utf-8'))
+            except (BrokenPipeError, ConnectionResetError):
+                # Client disconnected, just log and continue
+                print("Client disconnected during response")
+                return
             
             # Also log to file
             with open("server_log.txt", "a") as f:
                 f.write(response + "\n")
+                
         except Exception as e:
             print(f"Error: {e}")
+            self.close_connection = True
+
+    def handle(self):
+        """Handle a single HTTP request"""
+        try:
+            http.server.SimpleHTTPRequestHandler.handle(self)
+        except (BrokenPipeError, ConnectionResetError):
+            # Client disconnected, just log and continue
+            print("Client disconnected during request")
+            return
+        except Exception as e:
+            print(f"Error handling request: {e}")
             self.close_connection = True
 
 if __name__ == '__main__':
