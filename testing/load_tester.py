@@ -7,19 +7,30 @@ import random
 import logging
 import csv
 import os
+import json
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.dates import DateFormatter
 
 # Configuration
-PEAK_HOUR = 18  # 6 PM
+PEAK_HOURS = [8, 12, 18]  # Morning, midday, evening peaks
+PEAK_WEIGHTS = [0.6, 0.8, 1.0]  # Relative weights of each peak
 SIGMA_MINUTES = 60  # 1 hour standard deviation
-MAX_REQUESTS = 1_000_000  # Peak requests
-ABSOLUTE_MAX_REQUESTS = 1500  # Absolute max requests
+MAX_REQUESTS = 100000  # Peak requests
+ABSOLUTE_MAX_REQUESTS = 150000  # Absolute max requests
 INTERVAL_MINUTES = 5  # Run test every 5 minutes
 HISTORICAL_DATA_FILE = "historical_data.csv"
 LOAD_TEST_LOG = "load_test.log"
-OVERIDE = True
+POD_COUNTS_FILE = "pod_counts.json"
+SEED = 42  # Set seed for repeatability
+ENABLE_VISUALIZATION = True  # Generate graphs automatically
 
 HOST_URL = "http://localhost:80"
 HOST_ENDPOINT = "/" # requires at least / for ab testing cmd
+
+# Set random seed for repeatability
+random.seed(SEED)
+np.random.seed(SEED)
 
 # Configure logging
 logging.basicConfig(filename=LOAD_TEST_LOG, level=logging.INFO,
@@ -43,44 +54,51 @@ def initialize_historical_data():
             ]
             writer.writerow(headers)
 
+def initialize_pod_counts():
+    if not os.path.exists(POD_COUNTS_FILE):
+        with open(POD_COUNTS_FILE, 'w') as f:
+            json.dump({"data": []}, f)
+
 def calculate_load(current_time):
     """
-    Calculate requests based on Gaussian distribution around PEAK_HOUR.
-    - If current time is 5 PM, requests will be lower.
-    - If current time is 6 PM, requests will be at maximum.
-    Example:
-    - 5 PM: 
-        current_minutes = 17 * 60 + 0
-        peak_minutes = 18 * 60
-        delta = current_minutes - peak_minutes = -60
-        exponent = -(delta ** 2) / (2 * (SIGMA_MINUTES ** 2)) = -(60 ** 2) / (2 * (60 ** 2)) = -0.5
-        gaussian = math.exp(-0.5) = 0.6065306597126334
-        base_requests = 0.6065306597126334 * 10000 = 6065
-    - 6 PM:
-        current_minutes = 18 * 60 + 0
-        peak_minutes = 18 * 60
-        delta = current_minutes - peak_minutes = 0
-        exponent = -(delta ** 2) / (2 * (SIGMA_MINUTES ** 2)) = 0
-        gaussian = math.exp(0) = 1
-        base_requests = 1 * 10000 = 10000
-
+    Calculate requests based on multiple Gaussian distributions around PEAK_HOURS.
     """
     current_minutes = current_time.hour * 60 + current_time.minute
-    peak_minutes = PEAK_HOUR * 60
-    delta = current_minutes - peak_minutes
     
-    # Gaussian calculation
-    exponent = -(delta ** 2) / (2 * (SIGMA_MINUTES ** 2))
-    gaussian = math.exp(exponent)
-    base_requests = gaussian * MAX_REQUESTS
+    # Calculate contribution from each peak hour
+    total_load = 0
+    for peak_hour, weight in zip(PEAK_HOURS, PEAK_WEIGHTS):
+        peak_minutes = peak_hour * 60
+        delta = current_minutes - peak_minutes
+        
+        # Wrap around for 24-hour cycles (e.g., late night is close to early morning)
+        if delta > 12 * 60:
+            delta = delta - 24 * 60
+        elif delta < -12 * 60:
+            delta = delta + 24 * 60
+            
+        # Gaussian calculation
+        exponent = -(delta ** 2) / (2 * (SIGMA_MINUTES ** 2))
+        gaussian = math.exp(exponent)
+        total_load += gaussian * weight
     
-    # Add ±20% noise
-    noise = random.uniform(-0.2, 0.2)
-    requests = int(base_requests * (1 + noise)) # +/- 20% noise
+    # Normalize the load to 0-1 scale
+    total_load = min(total_load, 1.0)
+    
+    # Deterministic noise based on time
+    noise_seed = int(current_time.timestamp()) % 1000
+    r = np.random.RandomState(noise_seed)
+    noise = r.uniform(-0.15, 0.15)  # +/- 15% noise
+    
+    # Calculate final request count
+    base_requests = total_load * MAX_REQUESTS
+    requests = int(base_requests * (1 + noise))
     requests = min(requests, ABSOLUTE_MAX_REQUESTS)  # Cap at absolute max
+    
     return max(requests, 100)  # Ensure minimum requests
 
 def parse_ab_output(output):
+    # ... existing parse_ab_output function ...
     data = {
         'concurrency_level': 'N/A', 'time_taken': 'N/A',
         'complete_requests': '0', 'failed_requests': '0',
@@ -164,20 +182,58 @@ def parse_ab_output(output):
                         data[f'percentage_{p}'] = parts[i+1]
     return data
 
+def get_current_pod_count():
+    try:
+        # Get current pod count from kubectl
+        cmd = "kubectl get pods -l app=simpleweb --no-headers | wc -l"
+        result = subprocess.run(cmd, shell=True, check=True, 
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              text=True, timeout=10)
+        pod_count = int(result.stdout.strip())
+        return pod_count
+    except:
+        # Return default if couldn't get count
+        return 1
+
+def update_pod_counts_json(pod_count):
+    try:
+        with open(POD_COUNTS_FILE, 'r') as f:
+            data = json.load(f)
+    except:
+        data = {"data": []}
+    
+    # Add the current timestamp and pod count
+    now = datetime.datetime.now()
+    timestamp = f"{now.hour:02d}:{now.minute:02d}"
+    
+    # Check if entry for this timestamp already exists
+    updated = False
+    for entry in data["data"]:
+        if entry["timestamp"] == timestamp:
+            entry["podCount"] = pod_count
+            updated = True
+            break
+    
+    # If no existing entry, add a new one
+    if not updated:
+        data["data"].append({"timestamp": timestamp, "podCount": pod_count})
+    
+    # Sort by timestamp
+    data["data"].sort(key=lambda x: x["timestamp"])
+    
+    # Save updated data
+    with open(POD_COUNTS_FILE, 'w') as f:
+        json.dump(data, f, indent=2)
+
 def run_ab_test():
     now = datetime.datetime.now()
     requests = calculate_load(now)
     concurrency = max(requests // 100, 1)
     
     cmd = f"ab -n {requests} -c {concurrency} {HOST_URL}{HOST_ENDPOINT}"
-    if OVERIDE:
-        requests = MAX_REQUESTS
-        concurrency = 20_000
-        cmd = f"ab -n {requests} -c {concurrency} {HOST_URL}{HOST_ENDPOINT}"
-
 
     logging.info(f"Starting test: {cmd}")
-    print(f"Starting test: {cmd}")
+    print(f"[{now}] Starting test: {cmd} (calculated load: {requests} requests)")
     
     try:
         result = subprocess.run(cmd, shell=True, check=True,
@@ -185,6 +241,7 @@ def run_ab_test():
                                text=True, timeout=300)
         parsed_data = parse_ab_output(result.stdout)
         
+        # Record the test data
         with open(HISTORICAL_DATA_FILE, 'a', newline='') as f:
             writer = csv.writer(f)
             row = [
@@ -212,26 +269,72 @@ def run_ab_test():
             ]
             writer.writerow(row)
         
+        # Get and store the current pod count
+        pod_count = get_current_pod_count()
+        update_pod_counts_json(pod_count)
+        
+        # Generate visualizations if enabled
+        if ENABLE_VISUALIZATION:
+            try:
+                subprocess.run(["python", "visualize.py"], check=False)
+            except Exception as e:
+                logging.error(f"Visualization error: {str(e)}")
+        
         logging.info(f"Test completed: {cmd}")
-        print(f"Test completed: {cmd}")
+        print(f"[{now}] Test completed: {requests} requests, {parsed_data['requests_per_second']} req/s, current pods: {pod_count}")
     except subprocess.CalledProcessError as e:
         logging.error(f"Test failed: {e.stderr}")
+        print(f"Test failed: {e.stderr}")
     except Exception as e:
         logging.error(f"Unexpected error: {str(e)}")
+        print(f"Unexpected error: {str(e)}")
 
-
-
-# # Initialize files
-# initialize_historical_data()
-
-# # Schedule tests
-# schedule.every(INTERVAL_MINUTES).minutes.do(run_ab_test)
-
-# logging.info("Load testing started...")
-# while True:
-#     schedule.run_pending()
-#     time.sleep(1)
+def visualize_predicted_load():
+    """Generate a visualization of the predicted load pattern for the next 24 hours"""
+    hours = []
+    loads = []
+    
+    # Generate load for each 15-minute interval over 24 hours
+    start_time = datetime.datetime.now().replace(minute=0, second=0, microsecond=0)
+    for hour in range(24):
+        for minute in range(0, 60, 15):
+            time_point = start_time.replace(hour=hour, minute=minute)
+            hours.append(time_point)
+            loads.append(calculate_load(time_point))
+    
+    # Create the visualization
+    plt.figure(figsize=(12, 6))
+    plt.plot(hours, loads, 'b-')
+    plt.title('Predicted Load Pattern (Next 24 Hours)')
+    plt.xlabel('Time of Day')
+    plt.ylabel('Expected Requests')
+    plt.xticks(rotation=45)
+    plt.gca().xaxis.set_major_formatter(DateFormatter('%H:%M'))
+    plt.tight_layout()
+    plt.savefig('predicted_load.png')
+    plt.close()
 
 if __name__ == "__main__":
+    # Initialize data storage
     initialize_historical_data()
+    initialize_pod_counts()
+    
+    # Generate and show the predicted load pattern
+    visualize_predicted_load()
+    print("Generated predicted load visualization (predicted_load.png)")
+    
+    # Run once immediately
     run_ab_test()
+    
+    # Schedule regular runs
+    schedule.every(INTERVAL_MINUTES).minutes.do(run_ab_test)
+    
+    print(f"Load testing scheduled every {INTERVAL_MINUTES} minutes.")
+    print(f"Using random seed {SEED} for repeatable pattern.")
+    
+    try:
+        while True:
+            schedule.run_pending()
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("Load testing stopped by user.")
