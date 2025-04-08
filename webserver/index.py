@@ -21,7 +21,7 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
             if n <= 1:
                 return n
             return fib(n-1) + fib(n-2)
-        n = random.randint(30, 20000)
+        n = random.randint(30, 950)
         return fib(n)
 
     def compute_matrix_multiplication(self):
