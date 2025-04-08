@@ -145,6 +145,11 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
             return
             # self.close_connection = True
 
+    
+    def log_message(self, format, *args):
+        # Commenting out the log to suppress it or replace it with something custom
+        pass
+
     def handle(self):
         """Handle a single HTTP request"""
         try:
