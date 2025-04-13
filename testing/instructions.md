@@ -12,10 +12,13 @@ kubectl port-forward svc/simpleweb 30080:30080 &
 python load_tester.py
 
 # Terminal 3: Proactive scaler
-python proactive_scaler.py
+kubectl get hpa simpleweb-hpa --watch
 
 # Terminal 4: Metrics collector
 ```bash
 chmod +x metrics_collector.sh
 ./metrics_collector.sh
 ```
+
+
+nohup python3 load_tester.py > output.log 2>&1 &

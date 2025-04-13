@@ -9,229 +9,232 @@ import csv
 import os
 
 # Configuration
-PEAK_HOUR = 18  # 6 PM
-SIGMA_MINUTES = 60  # 1 hour standard deviation
-MAX_REQUESTS = 1_000_000  # Peak requests
-ABSOLUTE_MAX_REQUESTS = 1500  # Absolute max requests
-INTERVAL_MINUTES = 5  # Run test every 5 minutes
-HISTORICAL_DATA_FILE = "historical_data.csv"
+PEAK_HOURS = [2, 6, 7, 10, 14, 16, 18, 21]  # Multiple peaks at 8AM, 12PM, 6PM
+PEAK_WEIGHTS = [random.uniform(0.9, 1.1) for _ in range(len(PEAK_HOURS))]
+SIGMA_MINUTES = 40  # Peak width
+MAX_RATE = 110       # Maximum requests/sec
+MIN_RATE = 10        # Minimum requests/sec
+THREADS = 1
+CONNECTIONS = 4
+DURATION_SECONDS = 60  # Test duration in seconds
+# INTERVAL_MINUTES = 1    # 
+HISTORICAL_DATA_FILE = "load_test_data.csv"
 LOAD_TEST_LOG = "load_test.log"
-OVERIDE = True
+OUTPUT_DIR = "./output"
+HISTORICAL_DATA_FILE = os.path.join(OUTPUT_DIR, HISTORICAL_DATA_FILE)
+LOAD_TEST_LOG = os.path.join(OUTPUT_DIR, LOAD_TEST_LOG)
+# Ensure output directory exists
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+OVERIDE = False
 
-HOST_URL = "http://localhost:80"
-HOST_ENDPOINT = "/" # requires at least / for ab testing cmd
+# traffic configuration
+
+
+HOST_URL = "http://128.105.146.155/"
 
 # Configure logging
 logging.basicConfig(filename=LOAD_TEST_LOG, level=logging.INFO,
                     format='%(asctime)s - %(message)s')
 
 def initialize_historical_data():
+    HEADERS = ["timestamp", "hour", "minute", "pods", "target_rate",
+                "threads", "connections", "duration_sec",
+                "total_requests", "data_transferred_mb",
+                "requests_per_sec", "transfer_per_sec_mb",
+                "latency_avg_ms", "latency_stdev_ms", "latency_max_ms", 
+                "latency_stdev_pct", "req_sec_avg", "req_sec_stdev",
+                "req_sec_max", "req_sec_stdev_pct",
+                "p50_ms", "p75_ms", "p90_ms", "p99_ms", 
+                "p99.9_ms", "p99.99_ms", "p99.999_ms", "p100_ms"]
     if not os.path.exists(HISTORICAL_DATA_FILE):
         with open(HISTORICAL_DATA_FILE, 'w', newline='') as f:
             writer = csv.writer(f)
-            headers = [
-                "timestamp", "hour", "minute", "intended_requests",
-                "concurrency_level", "time_taken", "complete_requests", "failed_requests",
-                "total_transferred", "html_transferred", "requests_per_second",
-                "time_per_request_mean", "time_per_request_all", "transfer_rate",
-                "connect_min", "connect_mean", "connect_sd", "connect_median", "connect_max",
-                "processing_min", "processing_mean", "processing_sd", "processing_median", "processing_max",
-                "waiting_min", "waiting_mean", "waiting_sd", "waiting_median", "waiting_max",
-                "total_min", "total_mean", "total_sd", "total_median", "total_max",
-                "percentage_50", "percentage_66", "percentage_75", "percentage_80",
-                "percentage_90", "percentage_95", "percentage_98", "percentage_99", "percentage_100"
-            ]
+            headers = HEADERS
             writer.writerow(headers)
+    else:
+        logging.info(f"Historical data file '{HISTORICAL_DATA_FILE}' already exists.")
+        # verify headers are correct
+        with open(HISTORICAL_DATA_FILE, 'r') as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+            if headers != HEADERS:
+                logging.error(f"Historical data file '{HISTORICAL_DATA_FILE}' headers do not match expected format.")
+                raise ValueError("Historical data file headers do not match expected format.")
 
-def calculate_load(current_time):
+def get_hpa_info():
     """
-    Calculate requests based on Gaussian distribution around PEAK_HOUR.
-    - If current time is 5 PM, requests will be lower.
-    - If current time is 6 PM, requests will be at maximum.
-    Example:
-    - 5 PM: 
-        current_minutes = 17 * 60 + 0
-        peak_minutes = 18 * 60
-        delta = current_minutes - peak_minutes = -60
-        exponent = -(delta ** 2) / (2 * (SIGMA_MINUTES ** 2)) = -(60 ** 2) / (2 * (60 ** 2)) = -0.5
-        gaussian = math.exp(-0.5) = 0.6065306597126334
-        base_requests = 0.6065306597126334 * 10000 = 6065
-    - 6 PM:
-        current_minutes = 18 * 60 + 0
-        peak_minutes = 18 * 60
-        delta = current_minutes - peak_minutes = 0
-        exponent = -(delta ** 2) / (2 * (SIGMA_MINUTES ** 2)) = 0
-        gaussian = math.exp(0) = 1
-        base_requests = 1 * 10000 = 10000
+    return tuple of (pod_count, desiredReplicas, currentReplicas, nodes_count)
+    """
+    # pod_count=$(kubectl get pods -l app=simpleweb -o json | jq '.items | length')
+    # hpa_status=$(kubectl get hpa simpleweb-hpa -o json | jq -c '[.status.desiredReplicas, .status.currentReplicas]')
+    # nodes_count=$(kubectl get nodes --no-headers | wc -l)
+    # the above works in bash, now do python
+    try:
+        pod_count = subprocess.check_output("kubectl get pods -l app=simpleweb -o json | jq '.items | length'", shell=True)
+        pod_count = int(pod_count.strip())
+        hpa_status = subprocess.check_output("kubectl get hpa simpleweb-hpa -o json | jq -c '[.status.desiredReplicas, .status.currentReplicas]'", shell=True)
+        hpa_status = hpa_status.decode('utf-8').strip().split(',')
+        desired_replicas = int(hpa_status[0].strip('[]'))
+        current_replicas = int(hpa_status[1].strip('[]'))
+        nodes_count = subprocess.check_output("kubectl get nodes --no-headers | wc -l", shell=True)
+        nodes_count = int(nodes_count.strip())
+        return pod_count, desired_replicas, current_replicas, nodes_count
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error getting HPA info: {e}")
+        return 0, 0, 0, 0
 
-    """
+def calculate_traffic_rate(current_time):
+    """Multi-peak traffic calculation"""
     current_minutes = current_time.hour * 60 + current_time.minute
-    peak_minutes = PEAK_HOUR * 60
-    delta = current_minutes - peak_minutes
+    combined_rate = 0.0
     
-    # Gaussian calculation
-    exponent = -(delta ** 2) / (2 * (SIGMA_MINUTES ** 2))
-    gaussian = math.exp(exponent)
-    base_requests = gaussian * MAX_REQUESTS
-    
-    # Add ±20% noise
-    noise = random.uniform(-0.2, 0.2)
-    requests = int(base_requests * (1 + noise)) # +/- 20% noise
-    requests = min(requests, ABSOLUTE_MAX_REQUESTS)  # Cap at absolute max
-    return max(requests, 100)  # Ensure minimum requests
+    for peak_hour, weight in zip(PEAK_HOURS, PEAK_WEIGHTS):
+        peak_minutes = peak_hour * 60
+        delta = current_minutes - peak_minutes
+        exponent = -(delta ** 2) / (2 * (SIGMA_MINUTES ** 2))
+        peak_contribution = weight * math.exp(exponent)
+        # Normalize to MAX_RATE * weight at the peak
+        combined_rate += peak_contribution * MAX_RATE
 
-def parse_ab_output(output):
+    # Add noise
+    noise = random.uniform(-0.1, 0.1)
+    rate = int(combined_rate * (1 + noise))
+
+    return max(rate, MIN_RATE)
+
+def parse_wrk2_output(output):
     data = {
-        'concurrency_level': 'N/A', 'time_taken': 'N/A',
-        'complete_requests': '0', 'failed_requests': '0',
-        'total_transferred': '0', 'html_transferred': '0',
-        'requests_per_second': '0', 'time_per_request_mean': '0',
-        'time_per_request_all': '0', 'transfer_rate': '0'
+        'total_requests': 0, 'data_transferred_mb': 0.0,
+        'requests_per_sec': 0.0, 'transfer_per_sec_mb': 0.0,
+        'latency_avg_ms': 0.0, 'latency_stdev_ms': 0.0,
+        'latency_max_ms': 0.0, 'latency_stdev_pct': 0.0,
+        'req_sec_avg': 0.0, 'req_sec_stdev': 0.0,
+        'req_sec_max': 0.0, 'req_sec_stdev_pct': 0.0,
+        'p50_ms': 0.0, 'p75_ms': 0.0, 'p90_ms': 0.0,
+        'p99_ms': 0.0, 'p99.9_ms': 0.0, 'p99.99_ms': 0.0,
+        'p99.999_ms': 0.0, 'p100_ms': 0.0
     }
     
-    # Connection times and percentiles
-    connection_categories = ['Connect', 'Processing', 'Waiting', 'Total']
-    for cat in connection_categories:
-        for metric in ['min', 'mean', 'sd', 'median', 'max']:
-            data[f'{cat.lower()}_{metric}'] = '0'
-    
-    percentiles = ['50', '66', '75', '80', '90', '95', '98', '99', '100']
-    for p in percentiles:
-        data[f'percentage_{p}'] = '0'
-    
     lines = output.split('\n')
-    in_connection_times = False
-    in_percentages = False
-
+    in_percentiles = False
+    
     for line in lines:
         line = line.strip()
-        # Basic metrics
-        if line.startswith("Concurrency Level:"):
-            data['concurrency_level'] = line.split(':')[1].strip()
-        elif line.startswith("Time taken for tests:"):
-            data['time_taken'] = line.split()[4] if len(line.split()) >=5 else 'N/A'
-        elif line.startswith("Complete requests:"):
-            data['complete_requests'] = line.split(':')[1].strip()
-        elif line.startswith("Failed requests:"):
-            data['failed_requests'] = line.split(':')[1].strip()
-        elif line.startswith("Total transferred:"):
-            data['total_transferred'] = line.split(':')[1].split()[0].strip()
-        elif line.startswith("HTML transferred:"):
-            data['html_transferred'] = line.split(':')[1].split()[0].strip()
-        elif line.startswith("Requests per second:"):
-            data['requests_per_second'] = line.split()[3]
-        elif line.startswith("Time per request:        "):
-            if "(mean)" in line:
-                data['time_per_request_mean'] = line.split()[3]
-            elif "(mean, across all concurrent requests)" in line:
-                data['time_per_request_all'] = line.split()[3]
-        elif line.startswith("Transfer rate:"):
-            data['transfer_rate'] = line.split()[2]
-        # Connection Times
-        elif line.startswith("Connection Times (ms)"):
-            in_connection_times = True
-        elif in_connection_times:
-            if line.startswith("min  mean[+/-sd] median   max"):
-                continue
-            if not line:
-                in_connection_times = False
-                continue
-            parts = line.split(':')
-            if len(parts) < 2:
-                continue
-            category = parts[0].strip()
-            values = parts[1].split()
-            if len(values) >= 5:
-                data[f'{category.lower()}_min'] = values[0]
-                data[f'{category.lower()}_mean'] = values[1]
-                data[f'{category.lower()}_sd'] = values[2]
-                data[f'{category.lower()}_median'] = values[3]
-                data[f'{category.lower()}_max'] = values[4]
-        # Percentages
-        elif line.startswith("Percentage of the requests served within a certain time (ms)"):
-            in_percentages = True
-        elif in_percentages:
-            if not line:
-                in_percentages = False
-                continue
-            if "%" in line:
-                parts = line.split()
-                for i in range(0, len(parts), 2):
-                    if i+1 >= len(parts):
-                        break
-                    if '%' in parts[i]:
-                        p = parts[i].replace('%', '')
-                        data[f'percentage_{p}'] = parts[i+1]
+        
+        if line.startswith('Requests/sec:'):
+            data['requests_per_sec'] = float(line.split()[1])
+        elif line.startswith('Transfer/sec:'):
+            transfer = line.split()[1].replace('MB', '').replace('KB', 'e-3')
+            data['transfer_per_sec_mb'] = float(transfer)
+        elif line.startswith('Latency   '):
+            parts = line.split()
+            data['latency_avg_ms'] = parse_time(parts[1])
+            data['latency_stdev_ms'] = parse_time(parts[2])
+            data['latency_max_ms'] = parse_time(parts[3])
+            data['latency_stdev_pct'] = float(parts[4].replace('%', ''))
+        elif line.startswith('Req/Sec  '):
+            parts = line.split()
+            data['req_sec_avg'] = float(parts[1])
+            data['req_sec_stdev'] = float(parts[2])
+            data['req_sec_max'] = float(parts[3])
+            data['req_sec_stdev_pct'] = float(parts[4].replace('%', ''))
+        elif 'requests in ' in line and 'read' in line:
+            # Handle lines like: "4800 requests in 1.00m, 30.95MB read"
+            clean_line = line.replace(',', ' ')  # Remove comma from duration
+            parts = clean_line.split()
+            data['total_requests'] = int(parts[0])
+            data['data_transferred_mb'] = float(parts[4].replace('MB', ''))
+        elif line.startswith('Latency Distribution'):
+            in_percentiles = True
+        elif in_percentiles and '%' in line:
+            percentile, value = line.split('%')
+            # print(f"Parsing percentile: {percentile.strip()} with value: {value.strip()}")
+            # strip and remove trailing 0s
+            percentile = float(percentile.strip())
+            # if percentile == int(percentile):
+            #     percentile = str(int(percentile))
+            # else:
+            percentile = str(percentile).rstrip('0').rstrip('.')
+            value = parse_time(value.strip().split()[0])
+            # print(f"Parsing percentile: {percentile} with value: {value}")
+            data_key = f'p{percentile}_ms' if percentile != '100' else 'p100_ms'
+            # print(f"Data key: {data_key}")
+            if data_key in data:
+                data[data_key] = value
+                
     return data
 
-def run_ab_test():
+def parse_time(value):
+    units = {'ms': 1, 's': 1000, 'us': 0.001, 'm': 60000}  # Added minute support
+    for unit, multiplier in units.items():
+        if value.endswith(unit):
+            return float(value[:-len(unit)]) * multiplier
+    return float(value)
+
+def run_load_test():
     now = datetime.datetime.now()
-    requests = calculate_load(now)
-    concurrency = max(requests // 100, 1)
+    rate = calculate_traffic_rate(now)
+    test_duration = DURATION_SECONDS
     
-    cmd = f"ab -n {requests} -c {concurrency} {HOST_URL}{HOST_ENDPOINT}"
     if OVERIDE:
-        requests = MAX_REQUESTS
-        concurrency = 20_000
-        cmd = f"ab -n {requests} -c {concurrency} {HOST_URL}{HOST_ENDPOINT}"
+        rate = 80  # Fixed rate for dry run
+        test_duration = 60  # Local variable instead of modifying global
 
-
-    logging.info(f"Starting test: {cmd}")
-    print(f"Starting test: {cmd}")
+    cmd = f"wrk2 -t{THREADS} -c{CONNECTIONS} -d{test_duration}s -R{rate} --latency {HOST_URL}"
+    
+    # logging.info(f"Starting test: {cmd}")
+    logging.info(f"{now.hour}:{now.minute} rate: {rate} pods: {get_hpa_info()[0]}")
+    print(f"{now.hour}:{now.minute}:{now.second} rate: {rate} pods: {get_hpa_info()[0]}")
     
     try:
         result = subprocess.run(cmd, shell=True, check=True,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                               text=True, timeout=300)
-        parsed_data = parse_ab_output(result.stdout)
+                               text=True, timeout=test_duration+8)
+        
+        # Log raw output for debugging
+        logging.info(f"WRK2 Output:\n{result.stdout}")
+        if result.stderr:
+            logging.error(f"WRK2 Errors:\n{result.stderr}")
+
+        parsed = parse_wrk2_output(result.stdout)
+        # pods_count = get_pods_count() 
+        pods_count, desired_replicas, current_replicas, nodes_count = get_hpa_info()
         
         with open(HISTORICAL_DATA_FILE, 'a', newline='') as f:
             writer = csv.writer(f)
-            row = [
-                now.timestamp(), now.hour, now.minute, requests,
-                parsed_data['concurrency_level'], parsed_data['time_taken'],
-                parsed_data['complete_requests'], parsed_data['failed_requests'],
-                parsed_data['total_transferred'], parsed_data['html_transferred'],
-                parsed_data['requests_per_second'], parsed_data['time_per_request_mean'],
-                parsed_data['time_per_request_all'], parsed_data['transfer_rate'],
-                parsed_data['connect_min'], parsed_data['connect_mean'],
-                parsed_data['connect_sd'], parsed_data['connect_median'],
-                parsed_data['connect_max'], parsed_data['processing_min'],
-                parsed_data['processing_mean'], parsed_data['processing_sd'],
-                parsed_data['processing_median'], parsed_data['processing_max'],
-                parsed_data['waiting_min'], parsed_data['waiting_mean'],
-                parsed_data['waiting_sd'], parsed_data['waiting_median'],
-                parsed_data['waiting_max'], parsed_data['total_min'],
-                parsed_data['total_mean'], parsed_data['total_sd'],
-                parsed_data['total_median'], parsed_data['total_max'],
-                parsed_data['percentage_50'], parsed_data['percentage_66'],
-                parsed_data['percentage_75'], parsed_data['percentage_80'],
-                parsed_data['percentage_90'], parsed_data['percentage_95'],
-                parsed_data['percentage_98'], parsed_data['percentage_99'],
-                parsed_data['percentage_100']
-            ]
-            writer.writerow(row)
+            writer.writerow([
+                now.timestamp(), now.hour, now.minute, pods_count, rate,
+                THREADS, CONNECTIONS, test_duration,
+                parsed['total_requests'], parsed['data_transferred_mb'],
+                parsed['requests_per_sec'], parsed['transfer_per_sec_mb'],
+                parsed['latency_avg_ms'], parsed['latency_stdev_ms'],
+                parsed['latency_max_ms'], parsed['latency_stdev_pct'],
+                parsed['req_sec_avg'], parsed['req_sec_stdev'],
+                parsed['req_sec_max'], parsed['req_sec_stdev_pct'],
+                parsed['p50_ms'], parsed['p75_ms'], parsed['p90_ms'],
+                parsed['p99_ms'], parsed['p99.9_ms'], parsed['p99.99_ms'],
+                parsed['p99.999_ms'], parsed['p100_ms']
+            ])
         
         logging.info(f"Test completed: {cmd}")
         print(f"Test completed: {cmd}")
     except subprocess.CalledProcessError as e:
         logging.error(f"Test failed: {e.stderr}")
     except Exception as e:
-        logging.error(f"Unexpected error: {str(e)}")
+        logging.error(f"Error: {str(e)}")
+
+# Initialize data file
+initialize_historical_data()
+
+# Uncomment for scheduled operation
+# schedule.every(INTERVAL_MINUTES).minutes.do(run_load_test)
+# schedule.every().day.at("00:00").do(run_load_test)
 
 
-
-# # Initialize files
-# initialize_historical_data()
-
-# # Schedule tests
-# schedule.every(INTERVAL_MINUTES).minutes.do(run_ab_test)
-
-# logging.info("Load testing started...")
 # while True:
 #     schedule.run_pending()
 #     time.sleep(1)
 
 if __name__ == "__main__":
-    initialize_historical_data()
-    run_ab_test()
+    while True:
+        run_load_test()

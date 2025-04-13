@@ -1,10 +1,12 @@
 #!/bin/bash
 METRICS_FILE="metrics.csv"
 NODE_FILE="nodes.csv"
+POD_FILE="pods.csv"
 
 # Initialize files
 echo "timestamp,pod_count,hpa_desired,hpa_current,nodes_count" > $METRICS_FILE
 echo "timestamp,node_name,creation_time" > $NODE_FILE
+echo "timestamp,pod_name,creation_time" > $POD_FILE
 
 while true; do
     # Cluster metrics
@@ -20,6 +22,11 @@ while true; do
     kubectl get nodes -o json | jq -r '.items[] | [.metadata.creationTimestamp, .metadata.name] | @csv' | \
     while read -r line; do
         echo "$timestamp,$line" >> $NODE_FILE
+    done
+
+    kubectl get pods -l app=simpleweb -o json | jq -r '.items[] | [.metadata.name, .metadata.creationTimestamp] | @csv' | \
+    while read -r line; do
+        echo "$timestamp,$line" >> $POD_FILE
     done
     
     echo "Sleeping 5"
