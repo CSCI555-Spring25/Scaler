@@ -9,7 +9,8 @@ spec:
   maxReplicas: 10
   historyRetentionDays: 7
   updateInterval: 5  # minutes
-  predictionWindowMinutes: 10
+  # predictionWindowMinutes: 10  # Deprecated
+  predictionWindowSeconds: 15  # Using seconds for finer-grained predictions
   historicalWeight: 0.7
   currentWeight: 0.3
 ---

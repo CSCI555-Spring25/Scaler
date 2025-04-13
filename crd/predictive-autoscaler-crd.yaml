@@ -35,6 +35,12 @@ spec:
                   type: integer
                   minimum: 1
                   default: 10
+                  description: "Deprecated: Use predictionWindowSeconds instead"
+                predictionWindowSeconds:
+                  type: integer
+                  minimum: 1
+                  default: 15
+                  description: "Number of seconds to look ahead for predictions"
                 historicalWeight:
                   type: number
                   minimum: 0
