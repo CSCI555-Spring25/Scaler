@@ -7,6 +7,7 @@ import datetime
 import time
 import threading
 import logging
+import subprocess
 
 # K8s config 
 kubernetes.config.load_incluster_config()
@@ -96,16 +97,31 @@ def get_current_pod_count(namespace, deployment_name):
         logger.error(f"API error when getting pod count: {e}")
         raise
 
+def get_node_time():
+    try:
+        result = subprocess.run(['date', '+%H:%M'], capture_output=True, text=True)
+        time_str = result.stdout.strip()
+        logger.debug(f"Node time: {time_str}")
+        return time_str
+    except Exception as e:
+        logger.error(f"Error getting node time: {e}")
+        # Fallback to system time
+        now = datetime.datetime.now()
+        return f"{now.hour:02d}:{now.minute:02d}"
+
 def get_historical_pod_count_at_time(data, time_offset_minutes=0):
-    now = datetime.datetime.now(datetime.timezone.utc)
-    target_time = now - datetime.timedelta(minutes=time_offset_minutes)
+    # Get current time from node
+    now_str = get_node_time()
+    now_hour, now_minute = map(int, now_str.split(':'))
     
-    target_hour = target_time.hour
-    target_minute = target_time.minute
+    # Calculate target time
+    total_minutes = now_hour * 60 + now_minute - time_offset_minutes
+    target_hour = (total_minutes // 60) % 24
+    target_minute = total_minutes % 60
     
     # Target timestamp in HH:MM format
     target_timestamp = f"{target_hour:02d}:{target_minute:02d}"
-    logger.info(f"Looking for historical data at {target_timestamp} (offset: {time_offset_minutes} minutes)")
+    logger.info(f"Looking for historical data at {target_timestamp} (offset: {time_offset_minutes} minutes from {now_str})")
     
     # Ensure we're working with the data list
     data_list = data["data"] if isinstance(data, dict) and "data" in data else data
@@ -142,8 +158,8 @@ def get_historical_pod_count_at_time(data, time_offset_minutes=0):
     return 1
 
 def update_historical_data(data, current_pods, historical_weight=0.7, current_weight=0.3):
-    now = datetime.datetime.now(datetime.timezone.utc) 
-    timestamp = f"{now.hour:02d}:{now.minute:02d}"
+    # Get current time from node
+    timestamp = get_node_time()
     logger.info(f"Updating historical data for timestamp {timestamp} with current pods {current_pods} (weights: historical={historical_weight}, current={current_weight})")
     
     # Ensure we're working with the data list
@@ -227,7 +243,9 @@ def update_status(namespace, name, status_data):
     logger.info(f"Updating status for PredictiveAutoscaler {name} in namespace {namespace}")
     try: 
         if "lastUpdated" in status_data:
-            status_data["lastUpdated"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            # Use node time for status updates
+            node_time = subprocess.run(['date'], capture_output=True, text=True).stdout.strip()
+            status_data["lastUpdated"] = node_time
         
         logger.debug(f"Status data: {status_data}")
         custom_api.patch_namespaced_custom_object_status(
@@ -258,8 +276,7 @@ def create_fn(spec, name, namespace, logger, **kwargs):
     logger.info(f"Initial state: current_pods={current_pods}, historical_data_entries={len(historical_data['data'])}")
     
     if current_pods > 0: 
-        now = datetime.datetime.now(datetime.timezone.utc)
-        timestamp = f"{now.hour:02d}:{now.minute:02d}"
+        timestamp = get_node_time()
         historical_data["data"].append({"timestamp": timestamp, "podCount": current_pods})
         save_historical_data(historical_data, namespace, name)
         logger.info(f"Initialized historical data with timestamp {timestamp} and pod count {current_pods}")
@@ -320,7 +337,7 @@ def create_fn(spec, name, namespace, logger, **kwargs):
                 thread_logger.info(f"Historical data updated successfully")
                  
                 status_data = {
-                    "lastUpdated": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    "lastUpdated": "timestamp",  # Will be replaced in update_status
                     "currentPrediction": required_pods
                 }
                 thread_logger.info(f"Updating status with currentPrediction={required_pods}")
@@ -328,7 +345,7 @@ def create_fn(spec, name, namespace, logger, **kwargs):
             else:
                 thread_logger.warning(f"Deployment {target_deployment} has 0 pods, skipping update")
                 status_data = {
-                    "lastUpdated": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    "lastUpdated": "timestamp",  # Will be replaced in update_status
                     "lastError": "Deployment has 0 pods"
                 }
                 thread_logger.info(f"Updating status with error: Deployment has 0 pods")
@@ -343,7 +360,7 @@ def create_fn(spec, name, namespace, logger, **kwargs):
         except Exception as e:
             thread_logger.exception(f"Error in recurring update: {e}") 
             status_data = {
-                "lastUpdated": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "lastUpdated": "timestamp",  # Will be replaced in update_status
                 "lastError": str(e)
             }
             thread_logger.info(f"Updating status with error: {str(e)}")
