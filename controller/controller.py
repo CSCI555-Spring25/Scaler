@@ -24,7 +24,7 @@ DATA_DIR = "/data"
 GROUP = "scaler.cs.usc.edu"
 VERSION = "v1"
 PLURAL = "predictiveautoscalers"
-TIMEZONE = pytz.timezone('America/Chicago')
+TIMEZONE = pytz.UTC
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -103,7 +103,7 @@ def get_node_time():
     try:
         now = datetime.datetime.now(TIMEZONE)
         time_str = now.strftime('%H:%M')
-        logger.debug(f"Node time (America/Chicago): {time_str}")
+        logger.debug(f"Node time (UTC): {time_str}")
         return time_str
     except Exception as e:
         logger.error(f"Error getting node time: {e}")
@@ -245,7 +245,7 @@ def update_status(namespace, name, status_data):
     logger.info(f"Updating status for PredictiveAutoscaler {name} in namespace {namespace}")
     try: 
         if "lastUpdated" in status_data:
-            # Use Chicago timezone for status updates
+            # Use UTC timezone for status updates
             now = datetime.datetime.now(TIMEZONE)
             status_data["lastUpdated"] = now.strftime('%Y-%m-%d %H:%M:%S %Z')
         
