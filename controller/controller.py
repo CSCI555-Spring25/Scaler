@@ -31,7 +31,9 @@ def ensure_data_dir():
 
 def get_history_file_path(namespace=None, name=None):
     if not namespace and not name:  
-        return os.path.join(DATA_DIR, "traffic.json") 
+        return os.path.join(DATA_DIR, "traffic_1_interval.json") 
+    elif namespace == "default" and name == "simpleweb-predictor" and os.path.exists(os.path.join(DATA_DIR, "traffic_1_interval.json")):
+        return os.path.join(DATA_DIR, "traffic_1_interval.json")
     else:
         return os.path.join(DATA_DIR, f"{namespace}_{name}_history.json")
 
@@ -71,10 +73,18 @@ def get_historical_pod_count_at_time(data, time_offset_seconds=0):
     
     target_hour = target_time.hour
     target_minute = target_time.minute
-    target_second = (target_time.second // 15) * 15  # Floor to nearest 15-second interval
     
-    # Target timestamp in HH:MM:SS format
-    target_timestamp = f"{target_hour:02d}:{target_minute:02d}:{target_second:02d}"
+    # Check if the data is in HH:MM or HH:MM:SS format
+    has_seconds_format = any(len(entry.get("timestamp", "").split(":")) == 3 for entry in data.get("data", [])[:5])
+    
+    if has_seconds_format:
+        target_second = (target_time.second // 15) * 15  # Floor to nearest 15-second interval
+        # Target timestamp in HH:MM:SS format
+        target_timestamp = f"{target_hour:02d}:{target_minute:02d}:{target_second:02d}"
+    else:
+        # Target timestamp in HH:MM format (for traffic_1_interval.json)
+        target_timestamp = f"{target_hour:02d}:{target_minute:02d}"
+    
     logger.info(f"Looking for historical data at {target_timestamp}")
     
     # Exact match check
@@ -84,7 +94,9 @@ def get_historical_pod_count_at_time(data, time_offset_seconds=0):
             return entry["podCount"]
     
     # If exact match not found, find closest timestamp that's earlier 
-    target_seconds = target_hour * 3600 + target_minute * 60 + target_second
+    target_seconds = target_hour * 3600 + target_minute * 60
+    if has_seconds_format:
+        target_seconds += (target_time.second // 15) * 15
     
     closest_entry = None
     closest_diff = float('inf')
@@ -113,8 +125,16 @@ def get_historical_pod_count_at_time(data, time_offset_seconds=0):
 
 def update_historical_data(data, current_pods, historical_weight=0.7, current_weight=0.3):
     now = datetime.datetime.now(datetime.timezone.utc) 
-    # Create timestamp in HH:MM:SS format with seconds rounded to nearest 15-second interval
-    timestamp = f"{now.hour:02d}:{now.minute:02d}:{(now.second // 15) * 15:02d}"
+    
+    # Check if the data is in HH:MM or HH:MM:SS format
+    has_seconds_format = any(len(entry.get("timestamp", "").split(":")) == 3 for entry in data.get("data", [])[:5])
+    
+    if has_seconds_format:
+        # Create timestamp in HH:MM:SS format with seconds rounded to nearest 15-second interval
+        timestamp = f"{now.hour:02d}:{now.minute:02d}:{(now.second // 15) * 15:02d}"
+    else:
+        # Create timestamp in HH:MM format for traffic_1_interval.json
+        timestamp = f"{now.hour:02d}:{now.minute:02d}"
      
     for entry in data["data"]:
         if entry["timestamp"] == timestamp:
@@ -218,8 +238,17 @@ def create_fn(spec, name, namespace, logger, **kwargs):
     
     if current_pods > 0: 
         now = datetime.datetime.now(datetime.timezone.utc)
-        # Initialize with HH:MM:SS format using 15-second intervals
-        timestamp = f"{now.hour:02d}:{now.minute:02d}:{(now.second // 15) * 15:02d}"
+        
+        # Check if the data is in HH:MM or HH:MM:SS format
+        has_seconds_format = any(len(entry.get("timestamp", "").split(":")) == 3 for entry in historical_data.get("data", [])[:5])
+        
+        if has_seconds_format:
+            # Initialize with HH:MM:SS format using 15-second intervals
+            timestamp = f"{now.hour:02d}:{now.minute:02d}:{(now.second // 15) * 15:02d}"
+        else:
+            # Initialize with HH:MM format for traffic_1_interval.json
+            timestamp = f"{now.hour:02d}:{now.minute:02d}"
+            
         historical_data["data"].append({"timestamp": timestamp, "podCount": current_pods})
         save_historical_data(historical_data, namespace, name)
         logger.info(f"Initialized historical data with timestamp {timestamp} and pod count {current_pods}")
