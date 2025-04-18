@@ -31,7 +31,7 @@ def ensure_data_dir():
 
 def get_history_file_path(namespace=None, name=None):
     if not namespace and not name:  
-        return os.path.join(DATA_DIR, "realistic-traffic.json") 
+        return os.path.join(DATA_DIR, "traffic.json") 
     else:
         return os.path.join(DATA_DIR, f"{namespace}_{name}_history.json")
 
@@ -63,34 +63,43 @@ def get_current_pod_count(namespace, deployment_name):
             return 0
         raise
 
-def get_historical_pod_count_at_time(data, time_offset_minutes=0):
+def get_historical_pod_count_at_time(data, time_offset_seconds=0):
     now = datetime.datetime.now(datetime.timezone.utc)
-    target_time = now - datetime.timedelta(minutes=time_offset_minutes)
+    # For negative offset (prediction into future), we use positive time delta
+    # For positive offset (looking back in history), we use negative time delta
+    target_time = now + datetime.timedelta(seconds=time_offset_seconds)
     
     target_hour = target_time.hour
-    target_minute = (target_time.minute // 5) * 5  # Floor to nearest 5-minute
+    target_minute = target_time.minute
+    target_second = (target_time.second // 15) * 15  # Floor to nearest 15-second interval
     
-    # Target timestamp in HH:MM format
-    target_timestamp = f"{target_hour:02d}:{target_minute:02d}"
+    # Target timestamp in HH:MM:SS format
+    target_timestamp = f"{target_hour:02d}:{target_minute:02d}:{target_second:02d}"
     logger.info(f"Looking for historical data at {target_timestamp}")
     
-    #Exact match check
+    # Exact match check
     for entry in data["data"]:
         if entry["timestamp"] == target_timestamp:
             logger.info(f"Found exact match for {target_timestamp} with pod count {entry['podCount']}")
             return entry["podCount"]
     
     # If exact match not found, find closest timestamp that's earlier 
-    target_minutes = target_hour * 60 + target_minute
+    target_seconds = target_hour * 3600 + target_minute * 60 + target_second
     
     closest_entry = None
     closest_diff = float('inf')
     
     for entry in data["data"]: 
-        h, m = map(int, entry["timestamp"].split(':'))
-        entry_minutes = h * 60 + m
-        if entry_minutes <= target_minutes:
-            diff = target_minutes - entry_minutes
+        ts_parts = entry["timestamp"].split(':')
+        if len(ts_parts) == 3:  # HH:MM:SS format
+            h, m, s = map(int, ts_parts)
+            entry_seconds = h * 3600 + m * 60 + s
+        else:   
+            h, m = map(int, ts_parts)
+            entry_seconds = h * 3600 + m * 60
+            
+        if entry_seconds <= target_seconds:
+            diff = target_seconds - entry_seconds
             if diff < closest_diff:
                 closest_diff = diff
                 closest_entry = entry
@@ -104,7 +113,8 @@ def get_historical_pod_count_at_time(data, time_offset_minutes=0):
 
 def update_historical_data(data, current_pods, historical_weight=0.7, current_weight=0.3):
     now = datetime.datetime.now(datetime.timezone.utc) 
-    timestamp = f"{now.hour:02d}:{(now.minute // 5) * 5:02d}"
+    # Create timestamp in HH:MM:SS format with seconds rounded to nearest 15-second interval
+    timestamp = f"{now.hour:02d}:{now.minute:02d}:{(now.second // 15) * 15:02d}"
      
     for entry in data["data"]:
         if entry["timestamp"] == timestamp:
@@ -116,11 +126,16 @@ def update_historical_data(data, current_pods, historical_weight=0.7, current_we
         data["data"].append({"timestamp": timestamp, "podCount": current_pods})
         logger.info(f"Created new historical data entry for timestamp {timestamp} with pod count {current_pods}")
      
-    def timestamp_to_minutes(ts):
-        h, m = map(int, ts.split(':'))
-        return h * 60 + m
+    def timestamp_to_seconds(ts):
+        ts_parts = ts.split(':')
+        if len(ts_parts) == 3:  
+            h, m, s = map(int, ts_parts)
+            return h * 3600 + m * 60 + s
+        else:   
+            h, m = map(int, ts_parts)
+            return h * 3600 + m * 60
     
-    data["data"] = sorted(data["data"], key=lambda x: timestamp_to_minutes(x["timestamp"]))
+    data["data"] = sorted(data["data"], key=lambda x: timestamp_to_seconds(x["timestamp"]))
     
     return data
 
@@ -129,13 +144,13 @@ def prune_old_data(data, retention_days=7):
     logger.info(f"Historical data has {len(data['data'])} entries")
     return data
 
-def calculate_required_pods(current_pods, historical_data, max_replicas, prediction_window_minutes=10):
+def calculate_required_pods(current_pods, historical_data, max_replicas, prediction_window_seconds=15):
     historical_pods_now = get_historical_pod_count_at_time(historical_data, 0)
     
     if historical_pods_now == 0: # Divide by zero error fix
         historical_pods_now = 1  
          
-    historical_pods_ahead = get_historical_pod_count_at_time(historical_data, -prediction_window_minutes) # Buggy fix, Need to update function add offset
+    historical_pods_ahead = get_historical_pod_count_at_time(historical_data, prediction_window_seconds) 
     thread_logger.info(f"Historical data retrieved - historical pods now: {historical_pods_now}, historical pods ahead: {historical_pods_ahead}")
  
     ratio = current_pods / historical_pods_now
@@ -188,12 +203,23 @@ def create_fn(spec, name, namespace, logger, **kwargs):
     max_replicas = spec['maxReplicas']
     update_interval = spec.get('updateInterval', 5)  # default 5 minutes
     
+    # Handle both prediction window parameters for backward compatibility
+    if 'predictionWindowSeconds' in spec:
+        prediction_window_seconds = spec.get('predictionWindowSeconds', 15)
+    elif 'predictionWindowMinutes' in spec:
+        # Convert minutes to seconds if using the old parameter
+        prediction_window_seconds = spec.get('predictionWindowMinutes', 10) * 60
+        logger.warning("Using deprecated predictionWindowMinutes parameter - please update to predictionWindowSeconds")
+    else:
+        prediction_window_seconds = 15
+    
     historical_data = load_historical_data(namespace, name)
     current_pods = get_current_pod_count(namespace, target_deployment)
     
     if current_pods > 0: 
         now = datetime.datetime.now(datetime.timezone.utc)
-        timestamp = f"{now.hour:02d}:{(now.minute // 5) * 5:02d}"
+        # Initialize with HH:MM:SS format using 15-second intervals
+        timestamp = f"{now.hour:02d}:{now.minute:02d}:{(now.second // 15) * 15:02d}"
         historical_data["data"].append({"timestamp": timestamp, "podCount": current_pods})
         save_historical_data(historical_data, namespace, name)
         logger.info(f"Initialized historical data with timestamp {timestamp} and pod count {current_pods}")
@@ -218,7 +244,17 @@ def create_fn(spec, name, namespace, logger, **kwargs):
             historical_weight = spec.get('historicalWeight', 0.7)
             current_weight = spec.get('currentWeight', 0.3)
             history_retention_days = spec.get('historyRetentionDays', 7)
-            prediction_window_minutes = spec.get('predictionWindowMinutes', 10)
+            
+            # Handle both prediction window parameters for backward compatibility
+            if 'predictionWindowSeconds' in spec:
+                prediction_window_seconds = spec.get('predictionWindowSeconds', 15)
+            elif 'predictionWindowMinutes' in spec:
+                # Convert minutes to seconds if using the old parameter
+                prediction_window_seconds = spec.get('predictionWindowMinutes', 10) * 60
+                thread_logger.warning("Using deprecated predictionWindowMinutes parameter - please update to predictionWindowSeconds")
+            else:
+                prediction_window_seconds = 15
+            
             update_interval = spec.get('updateInterval', 5)
              
             current_pods = get_current_pod_count(namespace, target_deployment)
@@ -228,8 +264,8 @@ def create_fn(spec, name, namespace, logger, **kwargs):
             
             if current_pods > 0: 
                 required_pods = calculate_required_pods(
-                    current_pods, historical_data, max_replicas, prediction_window_minutes)
-                thread_logger.info(f"Required pods for next {prediction_window_minutes} minutes: {required_pods}")
+                    current_pods, historical_data, max_replicas, prediction_window_seconds)
+                thread_logger.info(f"Required pods for next {prediction_window_seconds} seconds: {required_pods}")
                 
                 # Update HPA
                 success = update_hpa(namespace, target_hpa, required_pods)
