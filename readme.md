@@ -51,6 +51,7 @@ or
 ### Test the controller
 
 #### Create the directory in your persistent volume if needed
+POD_NAME=$(kubectl get pods -l app=predictive-autoscaler-controller -o jsonpath="{.items[0].metadata.name}")
 `kubectl exec -it $POD_NAME -- mkdir -p /data`
 
 #### Copy sample data to your controller pod

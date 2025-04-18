@@ -36,9 +36,9 @@ def ensure_data_dir():
     os.makedirs(DATA_DIR, exist_ok=True)
 
 def get_history_file_path(namespace=None, name=None):
-    if not namespace and not name:  
-        file_path = os.path.join(DATA_DIR, "traffic_1_interval.json")
-    else:
+    file_path = os.path.join(DATA_DIR, "traffic_1_interval.json")
+    if not os.path.exists(file_path):
+        logger.warning(f"History file {file_path} does not exist, returning empty data")
         file_path = os.path.join(DATA_DIR, f"{namespace}_{name}_history.json")
     logger.debug(f"Using history file path: {file_path}")
     return file_path
