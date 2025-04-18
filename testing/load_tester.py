@@ -7,13 +7,14 @@ import random
 import logging
 import csv
 import os
+import pytz
 
 # Configuration
 PEAK_HOURS = [2, 6, 7, 10, 14, 16, 18, 21]  # Multiple peaks at 8AM, 12PM, 6PM
-PEAK_WEIGHTS = [random.uniform(0.9, 1.1) for _ in range(len(PEAK_HOURS))]
-SIGMA_MINUTES = 40  # Peak width
-MAX_RATE = 110       # Maximum requests/sec
-MIN_RATE = 10        # Minimum requests/sec
+PEAK_WEIGHTS = [random.uniform(0.85, 1.0) for _ in range(len(PEAK_HOURS))]
+SIGMA_MINUTES = 55  # Peak width
+MAX_RATE = 50       # Maximum requests/sec
+MIN_RATE = 1        # Minimum requests/sec
 THREADS = 1
 CONNECTIONS = 4
 DURATION_SECONDS = 60  # Test duration in seconds
@@ -29,11 +30,24 @@ OVERIDE = False
 
 # traffic configuration
 
+PST = pytz.timezone('US/Pacific')
+now_pst = datetime.datetime.now(PST)
+timestamp_str = now_pst.strftime("%-m_%-d_%Y__%-I_%M_%S_%p").lower()
+
+HISTORICAL_DATA_FILE = f"load_test_data_{timestamp_str}.csv"
+
 
 HOST_URL = "http://128.105.146.155/"
 
+
+def custom_time(*args):
+    return datetime.datetime.now(PST).timetuple()
+
+logging.Formatter.converter = custom_time
+
 # Configure logging
-logging.basicConfig(filename=LOAD_TEST_LOG, level=logging.INFO,
+logging.basicConfig(filename=LOAD_TEST_LOG, 
+                    level=logging.INFO,
                     format='%(asctime)s - %(message)s')
 
 def initialize_historical_data():

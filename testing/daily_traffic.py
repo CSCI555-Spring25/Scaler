@@ -8,11 +8,10 @@ import matplotlib.dates as mdates
 
 # Configuration
 PEAK_HOURS = [2, 6, 7, 10, 14, 16, 18, 21]  # Multiple peaks at 8AM, 12PM, 6PM
-# PEAK_WEIGHTS = random value between 0.5 and 1.5
-PEAK_WEIGHTS = [random.uniform(0.9, 1.1) for _ in range(len(PEAK_HOURS))]
-SIGMA_MINUTES = 40  # Peak width
-MAX_RATE = 150       # Maximum requests/sec
-MIN_RATE = 10        # Minimum requests/sec
+PEAK_WEIGHTS = [random.uniform(0.9, 1.0) for _ in range(len(PEAK_HOURS))]
+SIGMA_MINUTES = 55  # Peak width
+MAX_RATE = 45       # Maximum requests/sec
+MIN_RATE = 1        # Minimum requests/sec
 OUTPUT_CSV = "daily_traffic.csv"
 PLOT_FILE = "daily_traffic.png"
 OUTPUT_DIR = "./plots"
@@ -39,6 +38,8 @@ def calculate_traffic_rate(current_time):
         combined_rate += peak_contribution * MAX_RATE
 
     # Add noise
+    
+    noise = 0
     noise = random.uniform(-0.1, 0.1)
     rate = int(combined_rate * (1 + noise))
 
