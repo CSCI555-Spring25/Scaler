@@ -49,11 +49,24 @@ or
 `kubectl get pa` (using the short name)
 
 ### Test the controller
+
 #### Create the directory in your persistent volume if needed
 `kubectl exec -it predictive-autoscaler-controller-xxx -- mkdir -p /data`
 
-#### Copy the sample data file to your controller pod
+#### Copy sample data to your controller pod
+You can choose one of the following sample data files:
+
+##### Option 1: Realistic traffic data
 `kubectl cp Scaler/test-data/realistic-traffic.json predictive-autoscaler-controller-xxx:/data/default_simpleweb-predictor_history.json`
+
+##### Option 2: Traffic data with 1-minute intervals
+```
+# Get the pod name
+POD_NAME=$(kubectl get pods -l app=predictive-autoscaler-controller -o jsonpath="{.items[0].metadata.name}")
+
+# Copy the traffic data
+kubectl cp Scaler/testing/json/traffic_1_interval.json $POD_NAME:/data/traffic_1_interval.json
+```
 
 #### Check the logs to see if the controller is using the data correctly
 `kubectl logs -f deployment/predictive-autoscaler-controller`
@@ -64,6 +77,22 @@ or
 #### Check if the historical data is being updated
 `kubectl get predictiveautoscalers`
 
+### Automated Testing with 1-minute Traffic Data
+
+A convenient script has been added to automate the deployment and testing with traffic_1_interval.json:
+
+```bash
+cd CSCI555/Scaler/testing
+./test_with_traffic_1_interval.sh
+```
+
+This script will:
+1. Apply the CRD, RBAC, and controller deployment
+2. Wait for the controller pod to be ready
+3. Copy the traffic_1_interval.json file to the controller pod
+4. Deploy the simpleweb application and HPA
+5. Create the PredictiveAutoscaler instance
+6. Provide commands for monitoring the system
 
 # Kubernetes Cluster Deployment instructions on Cloudlab
 
