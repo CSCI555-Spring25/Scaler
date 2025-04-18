@@ -51,7 +51,7 @@ or
 ### Test the controller
 
 #### Create the directory in your persistent volume if needed
-`kubectl exec -it predictive-autoscaler-controller-xxx -- mkdir -p /data`
+`kubectl exec -it $POD_NAME -- mkdir -p /data`
 
 #### Copy sample data to your controller pod
 You can choose one of the following sample data files:
