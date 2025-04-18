@@ -8,7 +8,6 @@ import time
 import threading
 import logging
 import subprocess
-import pytz
 
 # K8s config 
 kubernetes.config.load_incluster_config()
@@ -24,7 +23,6 @@ DATA_DIR = "/data"
 GROUP = "scaler.cs.usc.edu"
 VERSION = "v1"
 PLURAL = "predictiveautoscalers"
-TIMEZONE = pytz.UTC
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -101,9 +99,9 @@ def get_current_pod_count(namespace, deployment_name):
 
 def get_node_time():
     try:
-        now = datetime.datetime.now(TIMEZONE)
+        now = datetime.datetime.now()
         time_str = now.strftime('%H:%M')
-        logger.debug(f"Node time (UTC): {time_str}")
+        logger.debug(f"Node time: {time_str}")
         return time_str
     except Exception as e:
         logger.error(f"Error getting node time: {e}")
@@ -245,9 +243,9 @@ def update_status(namespace, name, status_data):
     logger.info(f"Updating status for PredictiveAutoscaler {name} in namespace {namespace}")
     try: 
         if "lastUpdated" in status_data:
-            # Use UTC timezone for status updates
-            now = datetime.datetime.now(TIMEZONE)
-            status_data["lastUpdated"] = now.strftime('%Y-%m-%d %H:%M:%S %Z')
+            # Use local system time for status updates
+            now = datetime.datetime.now()
+            status_data["lastUpdated"] = now.strftime('%Y-%m-%d %H:%M:%S')
         
         logger.debug(f"Status data: {status_data}")
         custom_api.patch_namespaced_custom_object_status(
