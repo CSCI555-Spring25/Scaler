@@ -198,8 +198,8 @@ def run_load_test():
     cmd = f"wrk2 -t{THREADS} -c{CONNECTIONS} -d{test_duration}s -R{rate} --latency {HOST_URL}"
     
     # logging.info(f"Starting test: {cmd}")
-    logging.info(f"{now.hour}:{now.minute} rate: {rate} pods: {get_hpa_info()[0]}")
-    print(f"{now.hour}:{now.minute}:{now.second} rate: {rate} pods: {get_hpa_info()[0]}")
+    logging.info(f"Test Started: {now.hour}:{now.minute} rate: {rate} pods: {get_hpa_info()[0]}")
+    print(f"Test Started: {now.hour}:{now.minute}:{now.second} rate: {rate} pods: {get_hpa_info()[0]}")
     
     try:
         result = subprocess.run(cmd, shell=True, check=True,
@@ -237,6 +237,7 @@ def run_load_test():
         logging.error(f"Test failed: {e.stderr}")
     except Exception as e:
         logging.error(f"Error: {str(e)}")
+        print(f"Test completed: {str(e)}")
 
 # Initialize data file
 initialize_historical_data()
@@ -251,5 +252,7 @@ initialize_historical_data()
 #     time.sleep(1)
 
 if __name__ == "__main__":
+    print(f"Test Stats: \nPEAK_HOURS = {PEAK_HOURS}\nPEAK_WEIGHTS = {PEAK_WEIGHTS}\nSIGMA_MINUTES = {SIGMA_MINUTES}\nMAX_RATE = {MAX_RATE}\nMIN_RATE = {MIN_RATE}\nTHREADS = {THREADS}\nCONNECTIONS = {CONNECTIONS}")
+    print(f"Test start time: {timestamp_str}")
     while True:
         run_load_test()

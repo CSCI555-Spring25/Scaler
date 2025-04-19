@@ -62,3 +62,5 @@ nohup python3 load_tester.py > output.log 2>&1 &
    kubectl logs -f $POD_NAME
    kubectl get hpa simpleweb-hpa -w
    ```
+
+

@@ -114,8 +114,13 @@ def plot_requests_and_pods_over_time(df):
     plt.savefig(os.path.join(OUTPUT_DIR, 'requests_pods_over_time.png'))
     plt.close()
 
+import os
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+
 def plot_latency_distribution(df):
-    """Plot latency percentiles over time"""
+    """Plot latency percentiles over time with extreme outliers removed"""
     # Melt dataframe for better seaborn handling
     latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'p99_ms', 'p99.9_ms']
     melted_df = df.melt(
@@ -125,6 +130,18 @@ def plot_latency_distribution(df):
         value_name='latency'
     )
     
+    # Remove extreme outliers using IQR method
+    def remove_outliers(group):
+        q1 = group['latency'].quantile(0.02)
+        q3 = group['latency'].quantile(0.95)
+        iqr = q3 - q1
+        lower_bound = q1 - 1.5 * iqr
+        upper_bound = q3 + 1.5 * iqr
+        return group[(group['latency'] >= lower_bound) & (group['latency'] <= upper_bound)]
+
+    melted_df = melted_df.groupby('percentile', group_keys=False).apply(remove_outliers)
+
+    # Plot
     plt.figure(figsize=(15, 7))
     sns.lineplot(
         data=melted_df,
