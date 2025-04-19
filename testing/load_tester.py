@@ -13,8 +13,8 @@ import pytz
 PEAK_HOURS = [2, 6, 7, 10, 14, 16, 18, 21]  # Multiple peaks at 8AM, 12PM, 6PM
 PEAK_WEIGHTS = [random.uniform(0.85, 1.0) for _ in range(len(PEAK_HOURS))]
 SIGMA_MINUTES = 55  # Peak width
-MAX_RATE = 50       # Maximum requests/sec
-MIN_RATE = 1        # Minimum requests/sec
+MAX_RATE = 120       # Maximum requests/sec
+MIN_RATE = 10        # Minimum requests/sec
 THREADS = 1
 CONNECTIONS = 4
 DURATION_SECONDS = 60  # Test duration in seconds
@@ -35,6 +35,7 @@ now_pst = datetime.datetime.now(PST)
 timestamp_str = now_pst.strftime("%-m_%-d_%Y__%-I_%M_%S_%p").lower()
 
 HISTORICAL_DATA_FILE = f"load_test_data_{timestamp_str}.csv"
+LOAD_TEST_LOG = f"load_test_{timestamp_str}.log"
 
 
 HOST_URL = "http://128.105.146.155/"
@@ -157,7 +158,7 @@ def parse_wrk2_output(output):
             clean_line = line.replace(',', ' ')  # Remove comma from duration
             parts = clean_line.split()
             data['total_requests'] = int(parts[0])
-            data['data_transferred_mb'] = float(parts[4].replace('MB', ''))
+            data['data_transferred_mb'] = float(parts[4].replace('MB', '').replace('KB', 'e-3'))
         elif line.startswith('Latency Distribution'):
             in_percentiles = True
         elif in_percentiles and '%' in line:
@@ -179,7 +180,7 @@ def parse_wrk2_output(output):
     return data
 
 def parse_time(value):
-    units = {'ms': 1, 's': 1000, 'us': 0.001, 'm': 60000}  # Added minute support
+    units = {'us': 0.001, 'ms': 1, 's': 1000, 'm': 60000}  # Added minute support
     for unit, multiplier in units.items():
         if value.endswith(unit):
             return float(value[:-len(unit)]) * multiplier
