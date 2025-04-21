@@ -25,11 +25,12 @@ PEAK_PARAMS = [
 #     (3*60, 1.0,  3,  fall_sigma_min,  plateau_min ),   # 6PM
 #     ...
 # ]
-MAX_RATE = 125       # Maximum requests/sec
-MIN_RATE = 1        # Minimum requests/sec
+MAX_RATE = 145       # Maximum requests/sec
+MIN_RATE = 10        # Minimum requests/sec
 
-THREADS = 1
-CONNECTIONS = 4
+# overprovision
+THREADS = 16
+CONNECTIONS = 100
 DURATION_SECONDS = 60  # Test duration in seconds
 # INTERVAL_MINUTES = 1    # 
 HISTORICAL_DATA_FILE = "load_test_data.csv"

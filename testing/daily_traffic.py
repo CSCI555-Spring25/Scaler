@@ -6,8 +6,8 @@ import matplotlib.dates as mdates
 import math, random
 import os
 
-fall_sigma_min = 12
-plateau_min = 12
+fall_sigma_min = 11
+plateau_min = 11
 # Configuration
 
 PEAK_PARAMS = [
@@ -23,8 +23,8 @@ PEAK_PARAMS = [
 #     (3*60, 1.0,  3,  fall_sigma_min,  plateau_min ),   # 6PM
 #     ...
 # ]
-MAX_RATE = 125       # Maximum requests/sec
-MIN_RATE = 1        # Minimum requests/sec
+MAX_RATE = 140       # Maximum requests/sec
+MIN_RATE = 10        # Minimum requests/sec
 
 
 OUTPUT_CSV = "daily_traffic.csv"
