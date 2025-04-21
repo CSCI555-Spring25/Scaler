@@ -1,68 +1,178 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 #authors: yeasy.github.com
 #date: 2013-07-05
 
 import sys
-import BaseHTTPServer
-from SimpleHTTPServer import SimpleHTTPRequestHandler
+import http.server
 import socket
 import fcntl
 import struct
 import pickle
 from datetime import datetime
 from collections import OrderedDict
+import random
+import math
+from functools import lru_cache
 
-class HandlerClass(SimpleHTTPRequestHandler):
-    def get_ip_address(self,ifname):
+class HandlerClass(http.server.SimpleHTTPRequestHandler):
+    def compute_fibonacci(self):
+        @lru_cache(maxsize=None)
+        def fib(n):
+            if n <= 1:
+                return n
+            return fib(n-1) + fib(n-2)
+        n = random.randint(30, 200)
+        print(f"Executing Fibonacci task with n={n}")
+        return fib(n)
+
+    def compute_matrix_multiplication(self):
+        # Create two large random matrices
+
+        size = random.randint(10, 100)
+
+        print(f"Executing Matrix Multiplication task with size={size}x{size}")
+        matrix1 = [[random.random() for _ in range(size)] for _ in range(size)]
+        matrix2 = [[random.random() for _ in range(size)] for _ in range(size)]
+        
+        # Perform matrix multiplication using pure Python
+        result = [[0 for _ in range(size)] for _ in range(size)]
+        for i in range(size):
+            for j in range(size):
+                for k in range(size):
+                    result[i][j] += matrix1[i][k] * matrix2[k][j]
+        return result
+
+    def find_large_primes(self):
+        def is_prime(n):
+            if n < 2:
+                return False
+            for i in range(2, int(math.sqrt(n)) + 1):
+                if n % i == 0:
+                    return False
+            return True
+
+        primes = []
+        num = random.randint(1000, 2000)
+        print(f"Executing Large Primes task starting from {num}")
+        while len(primes) < 5:
+            if is_prime(num):
+                primes.append(num)
+            num += 1
+        return primes
+
+    def compute_string_permutations(self):
+        chars = 'abcdefghijklmnopqrstuvwxyz'
+        n = random.randint(2, 7)
+        print(f"Executing String Permutations task with string length={n}")
+        s = ''.join(random.choices(chars, k=n))
+        
+        def permute(s, l, r):
+            if l == r:
+                return
+            for i in range(l, r + 1):
+                s[l], s[i] = s[i], s[l]
+                permute(s, l + 1, r)
+                s[l], s[i] = s[i], s[l]
+        
+        s_list = list(s)
+        permute(s_list, 0, len(s_list) - 1)
+        return s
+
+    def get_ip_address(self, ifname):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         return socket.inet_ntoa(fcntl.ioctl(
             s.fileno(),
             0x8915,  # SIOCGIFADDR
-            struct.pack('256s', ifname[:15])
+            struct.pack('256s', ifname[:15].encode('utf-8'))
         )[20:24])
-    def log_message(self, format, *args):
-        if len(args) < 3 or "200" not in args[1]:
-            return
+
+    def do_GET(self):
+        """Handle GET requests by sending task information"""
         try:
-            request = pickle.load(open("pickle_data.txt","r"))
-        except:
-            request=OrderedDict()
-        time_now = datetime.now()
-        ts = time_now.strftime('%Y-%m-%d %H:%M:%S')
-        server = self.get_ip_address('eth0')
-        host=self.address_string()
-        addr_pair = (host,server)
-        if addr_pair not in request:
-            request[addr_pair]=[1,ts]
-        else:
-            num = request[addr_pair][0]+1
-            del request[addr_pair]
-            request[addr_pair]=[num,ts]
-        file=open("index.html", "w")
-        file.write("<!DOCTYPE html> <html> <body><center><h1><font color=\"blue\" face=\"Georgia, Arial\" size=8><em>Real</em></font> Visit Results</h1></center>");
-        for pair in request:
-            if pair[0] == host:
-                guest = "LOCAL: "+pair[0]
+            task_executed = False
+            task_name = None
+            result = None
+            
+            if random.random() < 0.5:
+                task_executed = True
+                tasks = {
+                    self.compute_fibonacci: "Fibonacci",
+                    self.compute_matrix_multiplication: "Matrix Multiplication",
+                    self.find_large_primes: "Large Primes",
+                    self.compute_string_permutations: "String Permutations"
+                }
+                chosen_task = random.choice(list(tasks.keys()))
+                task_name = tasks[chosen_task]
+                result = chosen_task()
+                
+            # Create response content
+            time_now = datetime.now()
+            ts = time_now.strftime('%Y-%m-%d %H:%M:%S')
+            
+            response_lines = [
+                f"=== Request at {ts} ===",
+            ]
+            if task_executed:
+                response_lines.extend([
+                    f"Compute-intensive task executed: {task_name}",
+                    f"Result: {result}"
+                ])
             else:
-                guest = pair[0]
-            if (time_now-datetime.strptime(request[pair][1],'%Y-%m-%d %H:%M:%S')).seconds < 3:
-                file.write("<p style=\"font-size:150%\" >#"+ str(request[pair][1]) +": <font color=\"red\">"+str(request[pair][0])+ "</font> requests " + "from &lt<font color=\"blue\">"+guest+"</font>&gt to WebServer &lt<font color=\"blue\">"+pair[1]+"</font>&gt</p>")
-            else:
-                file.write("<p style=\"font-size:150%\" >#"+ str(request[pair][1]) +": <font color=\"maroon\">"+str(request[pair][0])+ "</font> requests " + "from &lt<font color=\"navy\">"+guest+"</font>&gt to WebServer &lt<font color=\"navy\">"+pair[1]+"</font>&gt</p>")
-        file.write("</body> </html>");
-        file.close()
-        pickle.dump(request,open("pickle_data.txt","w"))
+                response_lines.append("No compute-intensive task executed")
+            response_lines.append("=" * 40)
+            
+            response = "\n".join(response_lines)
+            
+            # Send response
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.send_header('Content-length', str(len(response)))
+            self.end_headers()
+            
+            try:
+                self.wfile.write(response.encode('utf-8'))
+            except (BrokenPipeError, ConnectionResetError):
+                # Client disconnected, just log and continue
+                print("Client disconnected during response")
+                return
+            
+            # Also log to file
+            with open("server_log.txt", "a") as f:
+                f.write(response + "\n")
+                
+        except Exception as e:
+            print(f"Error: {e}")
+            return
+            # self.close_connection = True
+
+    
+    def log_message(self, format, *args):
+        # Commenting out the log to suppress it or replace it with something custom
+        pass
+
+    def handle(self):
+        """Handle a single HTTP request"""
+        try:
+            http.server.SimpleHTTPRequestHandler.handle(self)
+        except (BrokenPipeError, ConnectionResetError):
+            # Client disconnected, just log and continue
+            print("Client disconnected during request")
+            return
+        except Exception as e:
+            print(f"Error handling request: {e}")
+            return
+            self.close_connection = True
 
 if __name__ == '__main__':
     try:
-        ServerClass  = BaseHTTPServer.HTTPServer
-        Protocol     = "HTTP/1.0"
+        ServerClass = http.server.HTTPServer
+        Protocol = "HTTP/1.0"
         addr = len(sys.argv) < 2 and "0.0.0.0" or sys.argv[1]
         port = len(sys.argv) < 3 and 80 or int(sys.argv[2])
         HandlerClass.protocol_version = Protocol
         httpd = ServerClass((addr, port), HandlerClass)
         sa = httpd.socket.getsockname()
-        print "Serving HTTP on", sa[0], "port", sa[1], "..."
+        # print("Serving HTTP on", sa[0], "port", sa[1], "...")
         httpd.serve_forever()
     except:
         exit()
