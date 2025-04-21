@@ -8,7 +8,7 @@ os.makedirs('./json', exist_ok=True)
 
 # Read CSV file
 data = []
-with open('./data/load_test_data.csv', 'r') as csvfile:
+with open('./output/load_test_data.csv', 'r') as csvfile:
     csvreader = csv.DictReader(csvfile)
     for row in csvreader:
         data.append(row)
