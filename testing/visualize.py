@@ -6,7 +6,7 @@ from datetime import datetime
 import glob
 
 # Configuration
-DATA_DIR = "./data"
+DATA_DIR = "./output"
 OUTPUT_DIR = "./plots"
 DATE_FORMAT = "%Y-%m-%d"
 TIME_FORMAT = "%H:%M"
@@ -122,7 +122,8 @@ import pandas as pd
 def plot_latency_distribution(df):
     """Plot latency percentiles over time with extreme outliers removed"""
     # Melt dataframe for better seaborn handling
-    latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'p99_ms', 'p99.9_ms']
+    # latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'p99_ms', 'p99.9_ms']
+    latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'latency_avg_ms']
     melted_df = df.melt(
         id_vars=['date', 'time'],
         value_vars=latency_metrics,
@@ -132,11 +133,12 @@ def plot_latency_distribution(df):
     
     # Remove extreme outliers using IQR method
     def remove_outliers(group):
-        q1 = group['latency'].quantile(0.02)
-        q3 = group['latency'].quantile(0.95)
+        q1 = group['latency'].quantile(0.2)
+        q3 = group['latency'].quantile(0.75)
         iqr = q3 - q1
         lower_bound = q1 - 1.5 * iqr
         upper_bound = q3 + 1.5 * iqr
+        upper_bound = 100
         return group[(group['latency'] >= lower_bound) & (group['latency'] <= upper_bound)]
 
     melted_df = melted_df.groupby('percentile', group_keys=False).apply(remove_outliers)
@@ -315,7 +317,7 @@ def plot_performance_quadrant(df):
     g.ax_joint.set_xlabel('Requests/sec')
     g.ax_joint.set_ylabel('Average Latency (ms)')
     g.ax_joint.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.tight_layout()
+    # plt.tight_layout()
     plt.savefig(os.path.join(OUTPUT_DIR, 'performance_quadrant.png'))
     plt.close()
 

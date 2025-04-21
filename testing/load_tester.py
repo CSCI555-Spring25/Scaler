@@ -10,11 +10,24 @@ import os
 import pytz
 
 # Configuration
-PEAK_HOURS = [2, 6, 7, 10, 14, 16, 18, 21]  # Multiple peaks at 8AM, 12PM, 6PM
-PEAK_WEIGHTS = [random.uniform(0.85, 1.0) for _ in range(len(PEAK_HOURS))]
-SIGMA_MINUTES = 55  # Peak width
-MAX_RATE = 120       # Maximum requests/sec
-MIN_RATE = 10        # Minimum requests/sec
+fall_sigma_min = 12
+plateau_min = 12
+PEAK_PARAMS = [
+    (i * 60, 1.0, i, fall_sigma_min - (i // 2.5), plateau_min - (i // 2.5))
+    for i in range(1, 22)
+]
+
+# generates:
+# PEAK_PARAMS = [
+#     # (hour, weight, rise_sigma_min, fall_sigma_min, plateau_min)
+#     (1*60, 1.0,  1,  fall_sigma_min,  plateau_min ),   # e.g. 7AM peak, fall_sigma_min‑min rise, 20‑min flat, fall_sigma_min‑min fall
+#     (2*60, 1.0,  2, fall_sigma_min,  plateau_min ),   # noon
+#     (3*60, 1.0,  3,  fall_sigma_min,  plateau_min ),   # 6PM
+#     ...
+# ]
+MAX_RATE = 125       # Maximum requests/sec
+MIN_RATE = 1        # Minimum requests/sec
+
 THREADS = 1
 CONNECTIONS = 4
 DURATION_SECONDS = 60  # Test duration in seconds
@@ -38,7 +51,7 @@ HISTORICAL_DATA_FILE = f"load_test_data_{timestamp_str}.csv"
 LOAD_TEST_LOG = f"load_test_{timestamp_str}.log"
 
 
-HOST_URL = "http://128.105.146.155/"
+HOST_URL = "http://130.127.132.204/"
 
 
 def custom_time(*args):
@@ -98,24 +111,48 @@ def get_hpa_info():
         logging.error(f"Error getting HPA info: {e}")
         return 0, 0, 0, 0
 
-def calculate_traffic_rate(current_time):
-    """Multi-peak traffic calculation"""
-    current_minutes = current_time.hour * 60 + current_time.minute
-    combined_rate = 0.0
-    
-    for peak_hour, weight in zip(PEAK_HOURS, PEAK_WEIGHTS):
-        peak_minutes = peak_hour * 60
-        delta = current_minutes - peak_minutes
-        exponent = -(delta ** 2) / (2 * (SIGMA_MINUTES ** 2))
-        peak_contribution = weight * math.exp(exponent)
-        # Normalize to MAX_RATE * weight at the peak
-        combined_rate += peak_contribution * MAX_RATE
+_noise_prev = 0.0
+def correlated_noise(alpha=0.8, scale=0.02):
+    global _noise_prev
+    e = random.gauss(0, scale)
+    _noise_prev = alpha*_noise_prev + e
+    return _noise_prev
 
-    # Add noise
-    noise = random.uniform(-0.1, 0.1)
-    rate = int(combined_rate * (1 + noise))
+def baseline_multiplier(dt):
+    # weekends 40% lower
+    # return 0.6 if dt.weekday() >= 5 else 1.0
+    return 1.0
 
-    return max(rate, MIN_RATE)
+def calculate_traffic_rate(dt: datetime):
+    t_min = dt.hour*60 + dt.minute
+    total_weight = 0.0
+
+    for peak_min, weight, rise_s, fall_s, plateau in PEAK_PARAMS:
+        total_weight += peak_contribution(
+            t_min, peak_min, weight,
+            rise_s, fall_s, plateau
+        )
+
+    # Scale to rate, apply baseline and noise
+    noise = correlated_noise()
+    rate = total_weight * MAX_RATE * baseline_multiplier(dt) * (1 + noise)
+    return max(int(rate), MIN_RATE)
+
+def peak_contribution(t_min, peak_min, weight,
+                      rise_sigma, fall_sigma, plateau):
+    dt = t_min - peak_min
+    # plateau region
+    if abs(dt) <= plateau/2:
+        return weight
+    # rising edge
+    if -plateau/2 - 3*rise_sigma < dt < -plateau/2:
+        x = dt + plateau/2
+        return weight * math.exp(-x*x/(2*rise_sigma**2))
+    # falling edge
+    if plateau/2 < dt < plateau/2 + 3*fall_sigma:
+        x = dt - plateau/2
+        return weight * math.exp(-x*x/(2*fall_sigma**2))
+    return 0.0
 
 def parse_wrk2_output(output):
     data = {
@@ -252,7 +289,11 @@ initialize_historical_data()
 #     time.sleep(1)
 
 if __name__ == "__main__":
-    print(f"Test Stats: \nPEAK_HOURS = {PEAK_HOURS}\nPEAK_WEIGHTS = {PEAK_WEIGHTS}\nSIGMA_MINUTES = {SIGMA_MINUTES}\nMAX_RATE = {MAX_RATE}\nMIN_RATE = {MIN_RATE}\nTHREADS = {THREADS}\nCONNECTIONS = {CONNECTIONS}")
-    print(f"Test start time: {timestamp_str}")
+    info1 = (f"Test Stats: \nPEAK_PARAMS = {PEAK_PARAMS}\nMAX_RATE = {MAX_RATE}\nMIN_RATE = {MIN_RATE}\nTHREADS = {THREADS}\nCONNECTIONS = {CONNECTIONS}")
+    info2 = (f"Test start time: {timestamp_str}")
+    print(info1)
+    print(info2)
+    logging.info(info1)
+    logging.info(info2)
     while True:
         run_load_test()
