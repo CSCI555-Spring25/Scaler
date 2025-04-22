@@ -216,10 +216,24 @@ def calculate_required_pods(current_pods, historical_data, max_replicas, predict
     thread_logger.info(f"Ratio calculated: {ratio} (current pods: {current_pods}, historical pods now: {historical_pods_now})")
     required_pods = ratio * historical_pods_ahead
     logger.debug(f"Raw required pods calculation: {required_pods} = {ratio} * {historical_pods_ahead}")
+    
+    # Check for overprovisioning
+    if ratio > 1.4:
+        logger.warning(f"Potential overprovisioning detected: ratio={ratio} is >1.4x historical levels")
+        # Adjust the ratio to prevent excessive scaling
+        adjusted_ratio = 1.2
+        required_pods = adjusted_ratio * historical_pods_ahead
+        logger.info(f"Adjusted required pods to {required_pods} using dampened ratio {adjusted_ratio}")
      
     required_pods = min(int(required_pods), max_replicas)
     required_pods = max(required_pods, 1)
     thread_logger.info(f"Required pods calculated: {required_pods} (bounded between 1 and {max_replicas})")
+    
+    # Check if we're significantly overprovisioning compared to current load
+    #if required_pods > current_pods * 3:
+    #    logger.warning(f"Scaling would more than double current pods ({current_pods} → {required_pods})")
+    #    required_pods = max(current_pods * 2, current_pods + 1)
+   #     logger.info(f"Limiting scale-up to {required_pods} pods to prevent excessive overprovisioning")
     
     return required_pods
 
