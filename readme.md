@@ -147,6 +147,10 @@ Tag and push the docker container to the registry
 1. navigate to root directory of Scaler github repo
 2. Start the webserver with kubernetes: `kubectl apply -f echo-server.yaml`
 3. Check status of the running pods with `kubectl get pods`
+4. 
+
+### Exposing Service
+```kubectl expose deployment simpleweb-deployment --port=80 --type=LoadBalancer```
 
 
 # kubectl not returning nodes
