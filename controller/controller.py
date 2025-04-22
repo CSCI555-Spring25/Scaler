@@ -8,6 +8,7 @@ import time
 import threading
 import logging
 import subprocess
+import pytz
 
 # K8s config 
 kubernetes.config.load_incluster_config()
@@ -23,6 +24,7 @@ DATA_DIR = "/data"
 GROUP = "scaler.cs.usc.edu"
 VERSION = "v1"
 PLURAL = "predictiveautoscalers"
+PST = pytz.timezone('US/Pacific')
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -99,14 +101,14 @@ def get_current_pod_count(namespace, deployment_name):
 
 def get_node_time():
     try:
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(PST)
         time_str = now.strftime('%H:%M')
         logger.debug(f"Node time: {time_str}")
         return time_str
     except Exception as e:
         logger.error(f"Error getting node time: {e}")
         # Fallback to system time
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(PST)
         return f"{now.hour:02d}:{now.minute:02d}"
 
 def get_historical_pod_count_at_time(data, time_offset_minutes=0):
@@ -244,7 +246,7 @@ def update_status(namespace, name, status_data):
     try: 
         if "lastUpdated" in status_data:
             # Use local system time for status updates
-            now = datetime.datetime.now()
+            now = datetime.datetime.now(PST)
             status_data["lastUpdated"] = now.strftime('%Y-%m-%d %H:%M:%S')
         
         logger.debug(f"Status data: {status_data}")
