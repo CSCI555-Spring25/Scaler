@@ -201,7 +201,7 @@ def prune_old_data(data, retention_days=7):
     # TODO: Implement actual pruning logic
     return data
 
-def calculate_required_pods(current_pods, historical_data, max_replicas, prediction_window_minutes=3):
+def calculate_required_pods(current_pods, historical_data, max_replicas, prediction_window_minutes=4):
     logger.info(f"Calculating required pods (current: {current_pods}, max: {max_replicas}, window: {prediction_window_minutes} minutes)")
     historical_pods_now = get_historical_pod_count_at_time(historical_data, 0)
     
@@ -320,7 +320,7 @@ def create_fn(spec, name, namespace, logger, **kwargs):
             historical_weight = spec.get('historicalWeight', 0.7)
             current_weight = spec.get('currentWeight', 0.3)
             history_retention_days = spec.get('historyRetentionDays', 7)
-            prediction_window_minutes = spec.get('predictionWindowMinutes', 3)
+            prediction_window_minutes = spec.get('predictionWindowMinutes', 4)
             update_interval = spec.get('updateInterval', 5)
             
             thread_logger.info(f"Configuration: target_deployment={target_deployment}, target_hpa={target_hpa}, max_replicas={max_replicas}, historical_weight={historical_weight}, current_weight={current_weight}, history_retention_days={history_retention_days}, prediction_window_minutes={prediction_window_minutes}, update_interval={update_interval}")
