@@ -25,12 +25,12 @@ PEAK_PARAMS = [
 #     (3*60, 1.0,  3,  fall_sigma_min,  plateau_min ),   # 6PM
 #     ...
 # ]
-MAX_RATE = 145       # Maximum requests/sec
+MAX_RATE = 135       # Maximum requests/sec
 MIN_RATE = 10        # Minimum requests/sec
 
 # overprovision
-THREADS = 16
-CONNECTIONS = 100
+THREADS = 1
+CONNECTIONS = 4
 DURATION_SECONDS = 60  # Test duration in seconds
 # INTERVAL_MINUTES = 1    # 
 HISTORICAL_DATA_FILE = "load_test_data.csv"
@@ -119,6 +119,11 @@ def correlated_noise(alpha=0.8, scale=0.02):
     _noise_prev = alpha*_noise_prev + e
     return _noise_prev
 
+def make_noise():
+    min_val = -0.07
+    max_val = 0.07
+    return random.uniform(min_val, max_val)
+
 def baseline_multiplier(dt):
     # weekends 40% lower
     # return 0.6 if dt.weekday() >= 5 else 1.0
@@ -135,8 +140,12 @@ def calculate_traffic_rate(dt: datetime):
         )
 
     # Scale to rate, apply baseline and noise
-    noise = correlated_noise()
+    # noise = correlated_noise()
+    noise = make_noise()
     rate = total_weight * MAX_RATE * baseline_multiplier(dt) * (1 + noise)
+    rate = max(int(rate), MIN_RATE)
+    if rate < MIN_RATE * 2:
+        rate = rate * (1 + noise + 0.15) ** 3
     return max(int(rate), MIN_RATE)
 
 def peak_contribution(t_min, peak_min, weight,

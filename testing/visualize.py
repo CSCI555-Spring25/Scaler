@@ -1,9 +1,10 @@
 import os
+import glob
+import warnings
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from datetime import datetime
-import glob
 
 # Configuration
 DATA_DIR = "./output"
@@ -29,6 +30,25 @@ def load_data():
         dfs.append(df)
     
     return pd.concat(dfs, ignore_index=True)
+
+def preprocess_data(df):
+    # removed_rows = df[df['latency_max_ms'] > 500]
+    # removed_rows = df[df['target_rate'] < 8]
+    # removed_rows += df[df['target_rate'] < 4]
+    # for _, row in removed_rows.iterrows():
+    #     if row['target_rate'] > 18:
+    #         warnings.warn(
+    #             f"Row with high latency_max ({row['latency_max_ms']} ms) "
+    #             f"and target_rate ({row['target_rate']}) removed.")
+    df = df[~((df['target_rate'] < 20) & (df['latency_max_ms'] > 100))].copy()
+    df = df[(df['latency_max_ms'] < 1000)].copy()
+
+    # df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
+    # df['date'] = df['datetime'].dt.strftime(DATE_FORMAT)
+    # df['time'] = df['datetime'].dt.strftime(TIME_FORMAT)
+
+    return df
+
 
 def plot_requests_over_time(df):
     """Plot requests per second over time with multiple days"""
@@ -122,26 +142,14 @@ import pandas as pd
 def plot_latency_distribution(df):
     """Plot latency percentiles over time with extreme outliers removed"""
     # Melt dataframe for better seaborn handling
-    # latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'p99_ms', 'p99.9_ms']
-    latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'latency_avg_ms']
+    latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'p99_ms', 'p99.9_ms']
+    # latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'latency_avg_ms']
     melted_df = df.melt(
         id_vars=['date', 'time'],
         value_vars=latency_metrics,
         var_name='percentile',
         value_name='latency'
     )
-    
-    # Remove extreme outliers using IQR method
-    def remove_outliers(group):
-        q1 = group['latency'].quantile(0.2)
-        q3 = group['latency'].quantile(0.75)
-        iqr = q3 - q1
-        lower_bound = q1 - 1.5 * iqr
-        upper_bound = q3 + 1.5 * iqr
-        upper_bound = 100
-        return group[(group['latency'] >= lower_bound) & (group['latency'] <= upper_bound)]
-
-    melted_df = melted_df.groupby('percentile', group_keys=False).apply(remove_outliers)
 
     # Plot
     plt.figure(figsize=(15, 7))
@@ -164,6 +172,97 @@ def plot_latency_distribution(df):
     plt.tight_layout()
     plt.savefig(os.path.join(OUTPUT_DIR, 'latency_distribution.png'))
     plt.close()
+
+
+def plot_latency_if_target_rate_high(df):
+    """Plot latency percentiles over time only if target_rate > 10, using timestamp"""
+    # latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'latency_avg_ms']
+    latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'p99_ms', 'p99.9_ms']
+
+    # Convert timestamp to datetime
+    df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
+    
+    # Filter based on target_rate
+    filtered_df = df[df['target_rate'] > 4].copy()
+
+    # Melt for seaborn
+    melted_df = filtered_df.melt(
+        id_vars=['date', 'datetime'],
+        value_vars=latency_metrics,
+        var_name='percentile',
+        value_name='latency'
+    )
+
+    # Plot
+    plt.figure(figsize=(15, 7))
+    sns.lineplot(
+        data=melted_df,
+        x='datetime',
+        y='latency',
+        hue='percentile',
+        style='date',
+        markers=True,
+        dashes=False,
+        palette='viridis',
+        errorbar=None
+    )
+    plt.title('Latency Percentiles (target_rate > 6)')
+    plt.xlabel('Time')
+    plt.ylabel('Latency (ms)')
+    plt.xticks(rotation=45)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_DIR, 'latency_target_rate_gt_6.png'))
+    plt.close()
+
+def plot_latency_by_3hr_chunks(df):
+    """Create multiple latency plots split into 3-hour time chunks using timestamp"""
+    # latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'latency_avg_ms']
+    latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'p99_ms', 'p99.9_ms']
+    
+    # Convert timestamp to datetime
+    df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
+    df['hour'] = df['datetime'].dt.hour
+
+    for start_hour in range(0, 24, 3):
+        end_hour = start_hour + 3
+        chunk_df = df[(df['hour'] >= start_hour) & (df['hour'] < end_hour)].copy()
+
+        if chunk_df.empty:
+            continue
+
+        # Melt
+        melted_df = chunk_df.melt(
+            id_vars=['date', 'datetime'],
+            value_vars=latency_metrics,
+            var_name='percentile',
+            value_name='latency'
+        )
+
+
+        # Plot
+        plt.figure(figsize=(15, 7))
+        sns.lineplot(
+            data=melted_df,
+            x='datetime',
+            y='latency',
+            hue='percentile',
+            style='date',
+            markers=True,
+            dashes=False,
+            palette='viridis',
+            errorbar=None
+        )
+        plt.title(f'Latency Percentiles ({start_hour}:00–{end_hour}:00)')
+        plt.xlabel('Time')
+        plt.ylabel('Latency (ms)')
+        plt.xticks(rotation=45)
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.tight_layout()
+        filename = f'latency_chunk_{start_hour:02d}_{end_hour:02d}.png'
+        plt.savefig(os.path.join(OUTPUT_DIR, filename))
+        plt.close()
+
 
 def plot_target_vs_actual(df):
     plt.figure(figsize=(12, 7))
@@ -321,12 +420,120 @@ def plot_performance_quadrant(df):
     plt.savefig(os.path.join(OUTPUT_DIR, 'performance_quadrant.png'))
     plt.close()
 
+def plot_latency_with_target_rate(df):
+    """Plot latency percentiles over time with target_rate > 6 and overlay target rate"""
+    # latency_metrics = ['p50_ms', 'p75_ms']
+    # latency_metrics = ['p50_ms', 'p75_ms', 'latency_avg_ms']
+    # latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'p99_ms', 'p99.9_ms']
+    # latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'p99_ms', 'p99.9_ms', 'latency_avg_ms']
+    latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'p99_ms', 'latency_avg_ms']
+    
+    df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
+    filtered_df = df[df['target_rate'] > 4].copy()
+
+    melted_df = filtered_df.melt(
+        id_vars=['date', 'datetime', 'target_rate'],
+        value_vars=latency_metrics,
+        var_name='percentile',
+        value_name='latency'
+    )
+
+    plt.figure(figsize=(15, 7))
+    ax = sns.lineplot(
+        data=melted_df,
+        x='datetime',
+        y='latency',
+        hue='percentile',
+        style='date',
+        markers=True,
+        dashes=False,
+        palette='viridis',
+        errorbar=None
+    )
+
+    ax.set_title('Latency Percentiles with Target Rate Overlay (target_rate > 6)')
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Latency (ms)')
+    plt.xticks(rotation=45)
+
+    # Secondary axis for target_rate
+    ax2 = ax.twinx()
+    ax2.plot(filtered_df['datetime'], filtered_df['target_rate'], 'k--', label='Target Rate')
+    ax2.set_ylabel('Target Rate (req/s)')
+
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax2.legend(bbox_to_anchor=(1.05, 0.85), loc='upper left')
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_DIR, 'latency_with_target_rate_overlay.png'))
+    plt.close()
+
+
+def plot_latency_by_3hr_chunks_with_target(df):
+    """Create latency plots in 3-hour segments with target rate overlay"""
+    latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'latency_avg_ms']
+
+    df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
+    df['hour'] = df['datetime'].dt.hour
+
+    for start_hour in range(0, 24, 3):
+        end_hour = start_hour + 3
+        chunk_df = df[(df['hour'] >= start_hour) & (df['hour'] < end_hour)].copy()
+
+        if chunk_df.empty:
+            continue
+
+        melted_df = chunk_df.melt(
+            id_vars=['date', 'datetime', 'target_rate'],
+            value_vars=latency_metrics,
+            var_name='percentile',
+            value_name='latency'
+        )
+
+        plt.figure(figsize=(15, 7))
+        ax = sns.lineplot(
+            data=melted_df,
+            x='datetime',
+            y='latency',
+            hue='percentile',
+            style='date',
+            markers=True,
+            dashes=False,
+            palette='viridis',
+            errorbar=None
+        )
+
+        ax.set_title(f'Latency Percentiles with Target Rate ({start_hour:02d}:00–{end_hour:02d})')
+        ax.set_xlabel('Time')
+        ax.set_ylabel('Latency (ms)')
+        plt.xticks(rotation=45)
+
+        # Overlay target_rate
+        ax2 = ax.twinx()
+        ax2.plot(chunk_df['datetime'], chunk_df['target_rate'], 'k--', label='Target Rate')
+        ax2.set_ylabel('Target Rate (req/s)')
+
+        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax2.legend(bbox_to_anchor=(1.05, 0.85), loc='upper left')
+        plt.tight_layout()
+        filename = f'latency_chunk_with_target_{start_hour:02d}_{end_hour:02d}.png'
+        plt.savefig(os.path.join(OUTPUT_DIR, filename))
+        plt.close()
+
+
 def generate_report():
     """Main function to generate all visualizations"""
     sns.set_theme(style="whitegrid", palette="pastel")
     
     # Load data
     df = load_data()
+    df = preprocess_data(df)
+
+    plot_latency_if_target_rate_high(df)
+    # plot_latency_by_3hr_chunks(df)
+    plot_latency_with_target_rate(df)
+    plot_latency_by_3hr_chunks_with_target(df)
+
+
     
     # Generate plots
     plot_requests_over_time(df)

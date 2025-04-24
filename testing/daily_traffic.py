@@ -29,7 +29,7 @@ MIN_RATE = 10        # Minimum requests/sec
 
 OUTPUT_CSV = "daily_traffic.csv"
 PLOT_FILE = "daily_traffic.png"
-OUTPUT_DIR = "./plots"
+OUTPUT_DIR = "./traffic_example"
 # Ensure output directory exists
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
