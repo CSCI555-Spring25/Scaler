@@ -1,3 +1,4 @@
+import math
 import csv
 import json
 import os
@@ -8,7 +9,7 @@ os.makedirs('./json', exist_ok=True)
 
 # Read CSV file
 data = []
-with open('./output/load_test_data.csv', 'r') as csvfile:
+with open('./output/load_test_data_4_25_2025__2_01_47_am.csv', 'r') as csvfile:
     csvreader = csv.DictReader(csvfile)
     for row in csvreader:
         data.append(row)
@@ -19,7 +20,7 @@ for row in data:
     hour = int(row['hour'])
     minute = int(row['minute'])
     timestamp = f"{hour:02d}:{minute:02d}"
-    pod_count = int(row['pods'])
+    pod_count = int(math.ceil(float(row['pods'])))
     
     one_minute_data.append({
         "timestamp": timestamp,
@@ -40,7 +41,7 @@ for row in data:
     # Only add each 5-minute interval once (using the first occurrence)
     if interval_timestamp not in seen_intervals:
         seen_intervals.add(interval_timestamp)
-        pod_count = int(row['pods'])
+        pod_count = int(math.ceil(float(row['pods'])))
         
         five_minute_data.append({
             "timestamp": interval_timestamp,

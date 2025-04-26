@@ -22,7 +22,8 @@ chmod +x metrics_collector.sh
 
 
 nohup python3 load_tester.py > output.log 2>&1 &
-wrk2 -t1 -c4 -d60s -R113 --latency http://130.127.132.204
+wrk2 -t1 -c8 -d60s -R113 --latency http://128.105.146.155/
+wrk2 -t1 -c8 -d60s -R10 --latency http://128.105.146.155/
 
 
 

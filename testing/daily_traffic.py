@@ -6,13 +6,13 @@ import matplotlib.dates as mdates
 import math, random
 import os
 
-fall_sigma_min = 11
-plateau_min = 11
+fall_sigma_min = 12
+plateau_min = 12
 # Configuration
 
 PEAK_PARAMS = [
     (i * 60, 1.0, i, fall_sigma_min - (i // 2.5), plateau_min - (i // 2.5))
-    for i in range(1, 22)
+    for i in range(0, 25)
 ]
 
 # generates:
@@ -23,13 +23,13 @@ PEAK_PARAMS = [
 #     (3*60, 1.0,  3,  fall_sigma_min,  plateau_min ),   # 6PM
 #     ...
 # ]
-MAX_RATE = 140       # Maximum requests/sec
+MAX_RATE = 105       # Maximum requests/sec
 MIN_RATE = 10        # Minimum requests/sec
 
 
 OUTPUT_CSV = "daily_traffic.csv"
 PLOT_FILE = "daily_traffic.png"
-OUTPUT_DIR = "./plots"
+OUTPUT_DIR = "./traffic_examples"
 # Ensure output directory exists
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
@@ -40,11 +40,16 @@ OUTPUT_CSV = os.path.join(OUTPUT_DIR, OUTPUT_CSV)
 
 
 _noise_prev = 0.0
-def correlated_noise(alpha=0.8, scale=0.02):
+def correlated_noise(alpha=0.9, scale=0.015):
     global _noise_prev
     e = random.gauss(0, scale)
     _noise_prev = alpha*_noise_prev + e
     return _noise_prev
+
+def make_noise():
+    min_val = -0.07
+    max_val = 0.07
+    return random.uniform(min_val, max_val)
 
 def baseline_multiplier(dt):
     # weekends 40% lower
@@ -62,8 +67,12 @@ def calculate_traffic_rate(dt: datetime):
         )
 
     # Scale to rate, apply baseline and noise
-    noise = correlated_noise()
+    # noise = correlated_noise()
+    noise = make_noise()
     rate = total_weight * MAX_RATE * baseline_multiplier(dt) * (1 + noise)
+    rate = max(int(rate), MIN_RATE)
+    if rate < MIN_RATE * 2:
+        rate = rate * (1 + noise + 0.15) ** 3
     return max(int(rate), MIN_RATE)
 
 def peak_contribution(t_min, peak_min, weight,
