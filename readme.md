@@ -75,6 +75,40 @@ kubectl cp Scaler/testing/json/traffic_1_interval.json $POD_NAME:/data/traffic_1
 #### Check if the HPA is being updated
 `kubectl get hpa`
 
+### Modifying HPA Controller's Sync Period
+
+By default, the Kubernetes HPA controller checks metrics every 15 seconds. For testing your predictive autoscaling system with less reactive scaling, you can increase this interval:
+
+1. Edit the kube-controller-manager configuration:
+```bash
+# For kubeadm-based clusters (like Cloudlab's K8s profile):
+sudo nano /etc/kubernetes/manifests/kube-controller-manager.yaml
+```
+
+2. Find the `spec.containers.command` section and add or modify the following flag:
+```yaml
+- --horizontal-pod-autoscaler-sync-period=1m  # Changed from 15s to 1m (1 minute)
+```
+
+3. Save the file - Kubernetes will automatically restart the controller manager with the new configuration.
+
+4. Verify the changes have been applied:
+```bash
+# Check if the new flag is present in the controller manager configuration
+kubectl describe pod -n kube-system kube-controller-manager-node-0
+```
+
+5. For Microk8s clusters:
+```bash
+# Edit the microk8s controller manager configuration
+sudo nano /var/snap/microk8s/current/args/kube-controller-manager
+# Add the flag: --horizontal-pod-autoscaler-sync-period=1m
+sudo microk8s.stop
+sudo microk8s.start
+```
+
+This modification will make the HPA evaluate scaling decisions less frequently, putting more emphasis on the predictive scaling approach.
+
 #### Check if the historical data is being updated
 `kubectl get predictiveautoscalers`
 
