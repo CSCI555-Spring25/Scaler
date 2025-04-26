@@ -522,12 +522,12 @@ def plot_latency_by_3hr_chunks_with_target(df):
         plt.close()
 
 def plot_latency_by_1hr_chunks_with_target_offset(df):
-    """Create latency plots in 1-hour windows (e.g., 0:30–1:30) using existing hour and minute columns."""
-    # latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'latency_avg_ms']
+    """PREDICTIVE: latency plots in 1-hour windows (e.g., 0:30–1:30) using existing hour and minute columns."""
+    latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'latency_avg_ms']
     # latency_metrics = ['p50_ms', 'p75_ms']
     # latency_metrics = ['p50_ms', 'p75_ms', 'latency_avg_ms']
     # latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'p99_ms', 'p99.9_ms']
-    latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'p99_ms', 'p99.9_ms', 'latency_avg_ms']
+    # latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'p99_ms', 'p99.9_ms', 'latency_avg_ms']
     # latency_metrics = ['p50_ms', 'p75_ms', 'p90_ms', 'p99_ms', 'latency_avg_ms']
 
     # Assume df already has 'hour' and 'minute'
