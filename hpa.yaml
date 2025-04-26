@@ -7,12 +7,25 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: simpleweb-deployment
-  minReplicas: 1
-  maxReplicas: 3
+  minReplicas: 3
+  maxReplicas: 10
   metrics:
   - type: Resource
     resource:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 80
+        averageUtilization: 75
+  behavior:
+      scaleUp:
+        stabilizationWindowSeconds: 120 # A delay window: how long HPA waits before acting on scale up/down recommendations.
+        policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60 # what is the limit per this period of time. A rate limit window: how many replicas can be added/removed during this time.
+      scaleDown:
+        stabilizationWindowSeconds: 60
+        policies:
+        - type: Pods
+          value: 5
+          periodSeconds: 60 
