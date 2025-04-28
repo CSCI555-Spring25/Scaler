@@ -32,7 +32,7 @@ def load_data():
     return predictive_df, reactive_df
 
 # Helper function for time window creation
-def create_offset_windows(start_hour=4, start_minute=30, window_size=60):
+def create_offset_windows(start_hour=4, start_minute=30, window_size=40):
     """Generate 30-minute offset 1-hour windows"""
     windows = []
     current_hour = start_hour
@@ -50,13 +50,34 @@ def create_offset_windows(start_hour=4, start_minute=30, window_size=60):
             f"{end_hour:02d}:{end_minute:02d}"
         ))
         
-        # Move window by 30 minutes
-        current_hour += 0 if current_minute + 30 < 60 else 1
-        current_minute = (current_minute + 30) % 60
+        # Move window by dx minutes
+        dx = 20
+        current_hour += 0 if current_minute + 20 < 60 else 1
+        current_minute = (current_minute + 20) % 60
+
+    current_hour = start_hour
+    current_minute = start_minute
+    window_size += 20
+    while (current_hour < 23) or (current_hour == 23 and current_minute <= 30):
+        end_hour = current_hour
+        end_minute = current_minute + window_size
+        if end_minute >= 60:
+            end_hour += 1
+            end_minute %= 60
+        
+        windows.append((
+            f"{current_hour:02d}:{current_minute:02d}",
+            f"{end_hour:02d}:{end_minute:02d}"
+        ))
+        
+        # Move window by dx minutes
+        dx = 20
+        current_hour += 0 if current_minute + 20 < 60 else 1
+        current_minute = (current_minute + 20) % 60
     
     return windows
 
-def plot_individual_latency(ax, chunk, title, start_time, end_time, latency_metrics):
+def plot_individual_latency(ax, chunk, title, start_time, end_time, latency_metrics, ymax=None):
     """Helper function for individual latency plotting with dynamic metrics"""
     if chunk.empty:
         ax.text(0.5, 0.5, "No Data", ha='center', va='center')
@@ -90,7 +111,14 @@ def plot_individual_latency(ax, chunk, title, start_time, end_time, latency_metr
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax.legend(lines + lines2, labels + labels2, loc='upper left')
 
-def plot_combined_latency(ax, p_chunk, r_chunk, start, end, latency_metrics):
+    # Add axis limit control
+    if ymax is not None:
+        ax.set_ylim(0, ymax)
+        ax.set_ylabel(f"Latency (ms, 0-{ymax})", color=colors[0])
+    else:
+        ax.set_ylabel("Latency (ms)", color=colors[0])
+
+def plot_combined_latency(ax, p_chunk, r_chunk, start, end, latency_metrics, ymax=None):
     """Helper function for combined latency plotting with dynamic metrics"""
     # Create twin axes
     ax2 = ax.twinx()
@@ -134,8 +162,15 @@ def plot_combined_latency(ax, p_chunk, r_chunk, start, end, latency_metrics):
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax.legend(lines + lines2, labels + labels2, loc='upper left')
 
-def plot_latency_by_1hr_chunks_with_target_offset(predictive_df, reactive_df):
-    """Create multiple plot variations with different metric combinations"""
+    # Add axis limit control
+    if ymax is not None:
+        ax.set_ylim(0, ymax)
+        ax.set_ylabel(f"Latency (ms, 0-{ymax})", color=colors[0])
+    else:
+        ax.set_ylabel("Latency (ms)", color=colors[0])
+
+def plot_latency_by_1hr_chunks_with_target_offset(predictive_df, reactive_df, ymax=None):
+    """Create latency analysis plots with controlled y-axis limits"""
     metric_groups = [
         ['p50_ms', 'p75_ms', 'p90_ms', 'p99_ms'],
         ['p50_ms', 'p75_ms', 'p90_ms', 'latency_avg_ms'],
@@ -145,12 +180,11 @@ def plot_latency_by_1hr_chunks_with_target_offset(predictive_df, reactive_df):
     
     windows = create_offset_windows()
     
-    # Create main directory for this analysis
-    analysis_dir = os.path.join(OUTPUT_DIR, "latency_analysis")
+    # Create main directory for limited axis analysis
+    analysis_dir = os.path.join(OUTPUT_DIR, "latency_analysis_ax_limited")
     os.makedirs(analysis_dir, exist_ok=True)
     
     for group_idx, latency_metrics in enumerate(metric_groups):
-        # Create subdirectory for this metric group
         group_name = "_".join([m.replace("_ms", "") for m in latency_metrics])
         group_dir = os.path.join(analysis_dir, f"metrics_{group_name}")
         os.makedirs(group_dir, exist_ok=True)
@@ -177,32 +211,33 @@ def plot_latency_by_1hr_chunks_with_target_offset(predictive_df, reactive_df):
             plt.figure(figsize=(20, 12))
             gs = GridSpec(2, 2, figure=plt.gcf())
             
-            # Combined plot with current metric group
+            # Combined plot with axis limit
             ax_combined = plt.subplot(gs[:, 0])
-            plot_combined_latency(ax_combined, p_chunk, r_chunk, 
-                                start_time, end_time, latency_metrics)
+            plot_combined_latency(
+                ax_combined, p_chunk, r_chunk, 
+                start_time, end_time, latency_metrics,
+                ymax=ymax
+            )
             
-            # Individual plots with full metrics
+            # Individual plots with axis limits
             ax_predictive = plt.subplot(gs[0, 1])
-            plot_individual_latency(ax_predictive, p_chunk, "Predictive",
-                                   start_time, end_time, latency_metrics)
+            plot_individual_latency(
+                ax_predictive, p_chunk, "Predictive",
+                start_time, end_time, latency_metrics,
+                ymax=ymax
+            )
             
             ax_reactive = plt.subplot(gs[1, 1])
-            plot_individual_latency(ax_reactive, r_chunk, "Reactive",
-                                   start_time, end_time, latency_metrics)
+            plot_individual_latency(
+                ax_reactive, r_chunk, "Reactive",
+                start_time, end_time, latency_metrics,
+                ymax=ymax
+            )
             
             # Save with time window identifier in metric group subdirectory
-            filename = f"latency_{start_time.replace(':','')}-{end_time.replace(':','')}.png"
+            filename = f"latency_{start_time.replace(':','')}-{end_time.replace(':','')}_ymax-{ymax}.png"
             plt.savefig(os.path.join(group_dir, filename))
             plt.close()
-            
-            # Also save a CSV of the data used for this plot
-            # combined_chunk = pd.concat([
-            #     p_chunk.assign(system='predictive'),
-            #     r_chunk.assign(system='reactive')
-            # ])
-            # csv_filename = f"data_{start_time.replace(':','')}-{end_time.replace(':','')}.csv"
-            # combined_chunk.to_csv(os.path.join(group_dir, csv_filename), index=False)
 
 def plot_pods_with_target_rate(predictive_df, reactive_df):
     """Plot pod counts with target rate comparison"""
@@ -409,6 +444,8 @@ if __name__ == "__main__":
     
     # Generate required plots
     plot_latency_by_1hr_chunks_with_target_offset(predictive_df, reactive_df)
+    plot_latency_by_1hr_chunks_with_target_offset(predictive_df, reactive_df, ymax=200)
+    plot_latency_by_1hr_chunks_with_target_offset(predictive_df, reactive_df, ymax=600)
     plot_pods_with_target_rate(predictive_df, reactive_df)
     plot_requests_over_time(predictive_df, reactive_df)
     plot_target_vs_actual(predictive_df, reactive_df)
