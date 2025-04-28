@@ -23,75 +23,79 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "analysis_plots")).resolve()
 
-def slugify(text: str, maxlen: int = 30) -> str:
-    """Convert arbitrary text to a safe, compact directory fragment."""
+def _slugify(text: str, maxlen: int = 30) -> str:
+    """Safe, compact directory fragment."""
     text = re.sub(r"[^A-Za-z0-9]+", "-", text).strip("-")
     return text[:maxlen] or "none"
 
+def _mark_done(out_dir: Path):
+    (out_dir / ".done").touch()
+
+def _is_done(out_dir: Path) -> bool:
+    return (out_dir / ".done").exists()
+
+def _has_files(out_dir: Path) -> bool:
+    # Any non-hidden file anywhere under the run directory
+    return any(p.is_file() and not p.name.startswith('.') for p in out_dir.rglob('*'))
+
 def plot_cache(monitored_kwargs=None):
     """
-    Parameters
-    ----------
-    monitored_kwargs : list[str] | None
-        Names of kwargs that should appear in the directory slug.
-        Defaults to *all* kwargs, sorted.
+    Decorator for plotting routines that write files to OUTPUT_DIR.
+    - Caches based on kwargs + source-code hash.
+    - Skips if '.done' sentinel exists unless force=True.
     """
     def decorator(func):
-        # Pre-compute a hash of the *current* source code
         src_hash = hashlib.sha1(
             textwrap.dedent(inspect.getsource(func)).encode()
         ).hexdigest()[:7]
 
         @functools.wraps(func)
         def wrapper(*args, force=False, **kwargs):
-            # Allow env-var override
             force = force or os.getenv("PLOT_CACHE_FORCE") == "1"
 
-            # Build a readable parameter slug
+            # Build human-readable parameter slug
             kw_to_use = monitored_kwargs or sorted(kwargs)
-            pieces = [
-                f"{k}{slugify(str(kwargs.get(k)))}" for k in kw_to_use if k in kwargs
-            ] or ["default"]
+            pieces = [f"{k}{_slugify(str(kwargs[k]))}" for k in kw_to_use if k in kwargs] or ["default"]
             param_slug = "_".join(pieces)
 
-            # Compose final output directory
             out_dir = OUTPUT_DIR / func.__name__ / f"{param_slug}_{src_hash}"
             out_dir.mkdir(parents=True, exist_ok=True)
 
-            # Fast-path: skip if files already exist and no force flag
-            if not force and any(out_dir.iterdir()):
-                print(f"Skipping {func.__name__}; cached in {out_dir}")
+            if not force and _is_done(out_dir):
+                print(f"Skipping {func.__name__} (cached) → {out_dir}")
                 return out_dir
 
-            # --- run the plotting code --------------------------------------
+            # ---------- run the plotting code ----------
             prev_output_dir = os.environ.get("OUTPUT_DIR")
-            os.environ["OUTPUT_DIR"] = str(out_dir)       # hand off to inner code
+            os.environ["OUTPUT_DIR"] = str(out_dir)
             try:
                 func(*args, **kwargs)
             finally:
-                # restore even if the plot function raised
                 if prev_output_dir is None:
                     os.environ.pop("OUTPUT_DIR", None)
                 else:
                     os.environ["OUTPUT_DIR"] = prev_output_dir
-            # ----------------------------------------------------------------
+            # -------------------------------------------
 
-            # Maintain a convenient 'latest' symlink
-            latest_link = out_dir.parent / "latest"
-            try:
-                if latest_link.is_symlink() or latest_link.exists():
-                    latest_link.unlink()
-                latest_link.symlink_to(out_dir.name, target_is_directory=True)
-            except OSError:
-                # On Windows or restricted FS, silently ignore
-                pass
-
-            print(f"Generated {func.__name__} → {out_dir}")
+            # Did we actually create something?
+            if _has_files(out_dir):
+                _mark_done(out_dir)
+                # keep a convenient 'latest' symlink
+                latest = out_dir.parent / "latest"
+                try:
+                    if latest.is_symlink() or latest.exists():
+                        latest.unlink()
+                    latest.symlink_to(out_dir.name, target_is_directory=True)
+                except OSError:
+                    pass
+                print(f"Generated {func.__name__} → {out_dir}")
+            else:
+                # Nothing written: warn so you can fix the plot code
+                print(f"[WARN] {func.__name__} produced no files in {out_dir}")
             return out_dir
 
         return wrapper
     return decorator
-
 
 def load_data():
     """Load predictive and reactive datasets without datetime processing"""
@@ -154,7 +158,6 @@ def create_offset_windows(start_hour=4, start_minute=30, window_size=40):
     
     return windows
 
-@plot_cache()
 def plot_individual_latency(ax, chunk, title, start_time, end_time, latency_metrics, ymax=None):
     """Helper function for individual latency plotting with dynamic metrics"""
     if chunk.empty:
@@ -196,7 +199,6 @@ def plot_individual_latency(ax, chunk, title, start_time, end_time, latency_metr
     else:
         ax.set_ylabel("Latency (ms)", color=colors[0])
 
-@plot_cache()
 def plot_combined_latency(ax, p_chunk, r_chunk, start, end, latency_metrics, ymax=None):
     """Helper function for combined latency plotting with dynamic metrics"""
     # Create twin axes
@@ -699,14 +701,17 @@ def plot_window_comparison(stats, start, end, output_dir):
 def plot_latency_and_pods_by_1hr_chunks(predictive_df, reactive_df, ymax=None):
     """Create latency analysis plots with pod count overlays"""
     metric_groups = [
-        ['p50_ms', 'p90_ms', 'latency_avg_ms'],
-        ['p75_ms', 'p99_ms'],
-        ['latency_avg_ms', 'p99.9_ms']
+        ['p50_ms', 'p75_ms'],
+        ['p50_ms', 'latency_avg_ms'],
+        ['p50_ms', 'p75_ms', 'p90_ms', 'p99_ms'],
+        ['p50_ms', 'p75_ms', 'p90_ms', 'latency_avg_ms'],
     ]
     
     windows = create_offset_windows()
+    # windows = windows[10:16]
     
     analysis_dir = os.path.join(os.environ["OUTPUT_DIR"], "latency_pods_analysis")
+    # analysis_dir = os.path.join("latency_pods_analysis")
     os.makedirs(analysis_dir, exist_ok=True)
 
     for group_idx, latency_metrics in enumerate(metric_groups):
@@ -759,6 +764,7 @@ def plot_latency_and_pods_by_1hr_chunks(predictive_df, reactive_df, ymax=None):
             )
 
             filename = f"latency_pods_{start_time.replace(':','')}-{end_time.replace(':','')}_ymax-{ymax}.png"
+            plt.subplots_adjust(top=0.95)
             plt.savefig(os.path.join(group_dir, filename))
             plt.close()
     print(f"saved plot_latency_and_pods_by_1hr_chunks to {group_dir}")
@@ -770,42 +776,63 @@ def plot_individual_latency_with_pods(ax, chunk, title, start_time, end_time,
         ax.text(0.5, 0.5, "No Data", ha='center', va='center')
         return
 
-    # Plot latency metrics
+    # ====================== Primary Axis (Left) ======================
+    # Plot latency metrics on primary left axis
     colors = sns.color_palette("husl", n_colors=len(latency_metrics))
     for idx, metric in enumerate(latency_metrics):
         sns.lineplot(data=chunk, x='time_id', y=metric, ax=ax,
                     label=f"{metric.replace('_ms', '')}", color=colors[idx])
 
-    # Create twin axes
-    ax2 = ax.twinx()  # For target rate and pods
-    
-    # Plot target rate
-    ax2.plot(chunk['time_id'], chunk['target_rate'], 
-            color='#2c3e50', linestyle='--', linewidth=1.5, 
-            label='Target Rate', alpha=0.7)
-
-    # Plot pods with filled area
-    ax2.fill_between(chunk['time_id'], chunk['pods'], 
-                    color='#27ae60', alpha=0.2, label='Pods')
-    ax2.plot(chunk['time_id'], chunk['pods'], 
-            color='#27ae60', linewidth=1.5, linestyle='-')
-
-    # Axis configuration
-    ax.set_title(f"{title} System: {start_time}-{end_time}\nLatency Metrics with Pod Scaling")
+    ax.set_title(f"{title} System: {start_time}-{end_time}\nLatency with Operational Metrics")
     ax.set_xlabel("Time (Decimal Hours)", fontsize=10)
     ax.set_ylabel("Latency (ms)", color=colors[0])
-    ax2.set_ylabel("Target Rate (req/s) / Pod Count", color='#2c3e50')
+    ax.tick_params(axis='y', colors=colors[0])
     
     if ymax:
         ax.set_ylim(0, ymax)
-        ax.set_ylabel(f"Latency (ms, 0-{ymax})", color=colors[0])
 
-    # Legend handling
-    lines = ax.get_legend_handles_labels()
-    lines2 = ax2.get_legend_handles_labels()
-    combined = [lines[0] + lines2[0], [lines[1] + lines2[1]]]
-    ax.legend(*combined, loc='upper left', frameon=True,
-             facecolor='white', framealpha=0.8)
+    # ====================== Secondary Axis (Right - Target Rate) ======================
+    ax2 = ax.twinx()  # First right axis for target rate
+    ax2.plot(chunk['time_id'], chunk['target_rate'], 
+            color='#8e44ad', linestyle='--', linewidth=1.5, 
+            label='Target Rate', alpha=0.9)
+    
+    # Configure target rate axis
+    ax2.set_ylabel("Target Rate (req/s)", color='#8e44ad', labelpad=15)
+    ax2.tick_params(axis='y', colors='#8e44ad')
+    ax2.spines['right'].set_position(('axes', 1.0))
+
+    # ====================== Tertiary Axis (Far Right - Pods) ======================
+    ax3 = ax.twinx()  # Second right axis for pods
+    ax3.spines['right'].set_position(('axes', 1.1))  # Offset 15% from first right axis
+    
+    # Plot pods with full scale
+    ax3.fill_between(chunk['time_id'], chunk['pods'], 
+                    color='#27ae60', alpha=0.3, label='Pods')
+    ax3.plot(chunk['time_id'], chunk['pods'], 
+            color='#27ae60', linewidth=2, linestyle='-')
+    
+    # Configure pod axis
+    ax3.set_ylabel("Pod Count", color='#27ae60', labelpad=25)
+    ax3.tick_params(axis='y', colors='#27ae60')
+    
+    # Auto-scale pods to use 70% of vertical space
+    pod_buffer = chunk['pods'].max() * 0.3
+    ax3.set_ylim(0, chunk['pods'].max() + pod_buffer)
+
+    # ====================== Unified Legend ======================
+    # Combine handles from all axes
+    handles1, labels1 = ax.get_legend_handles_labels()
+    handles2, labels2 = ax2.get_legend_handles_labels()
+    handles3, labels3 = ax3.get_legend_handles_labels()
+    
+    # Create unified legend
+    combined_handles = handles1 + handles2 + handles3
+    combined_labels = labels1 + labels2 + labels3
+    
+    ax.legend(combined_handles, combined_labels, loc='upper left',
+             frameon=True, facecolor='white', framealpha=1.0,
+             bbox_to_anchor=(0.00, 1), borderaxespad=0.)
 
 def plot_enhanced_combined_latency(ax, p_chunk, r_chunk, start, end, 
                                   latency_metrics, ymax=None):
@@ -848,8 +875,9 @@ def plot_enhanced_combined_latency(ax, p_chunk, r_chunk, start, end,
     lines = ax.get_legend_handles_labels()
     lines2 = ax2.get_legend_handles_labels()
     combined = [lines[0] + lines2[0], [lines[1] + lines2[1]]]
-    ax.legend(*combined, loc='upper left', frameon=True,
-             facecolor='white', framealpha=0.8)
+    ax.legend(**combined, loc='upper left',
+             facecolor='white', framealpha=1,
+             bbox_to_anchor=(0.00, 1), borderaxespad=0.)
 
 # Main execution
 if __name__ == "__main__":
@@ -875,6 +903,6 @@ if __name__ == "__main__":
     plot_traffic_pattern_comparison(predictive_df, reactive_df)
     plot_latency_distribution_ridges(predictive_df, reactive_df)
 
-    plot_latency_and_pods_by_1hr_chunks(predictive_df, reactive_df)
+    # plot_latency_and_pods_by_1hr_chunks(predictive_df, reactive_df)
     plot_latency_and_pods_by_1hr_chunks(predictive_df, reactive_df, ymax=400)
 
