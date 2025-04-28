@@ -594,12 +594,10 @@ def generate_report():
 
     plot_latency_if_target_rate_high(df)
     plot_latency_by_1hr_chunks_with_target_offset(df)
-    # plot_latency_by_3hr_chunks(df)
+    plot_latency_by_3hr_chunks(df)
     plot_latency_with_target_rate(df)
     plot_latency_by_3hr_chunks_with_target(df)
 
-
-    
     # Generate plots
     plot_requests_over_time(df)
     plot_latency_distribution(df)
