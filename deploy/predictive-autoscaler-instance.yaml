@@ -9,8 +9,8 @@ spec:
   maxReplicas: 10
   historyRetentionDays: 7
   updateInterval: 1  # Reduced to 1 minute for testing with 1-minute interval data
-  predictionWindowMinutes: 4  # Deprecated
-  predictionWindowSeconds: 240  # Using 60 seconds (1 minute) for traffic_1_interval.json
+  predictionWindowMinutes: 2  # Deprecated
+  predictionWindowSeconds: 120  # Using 60 seconds (1 minute) for traffic_1_interval.json
   historicalWeight: 0.7
   currentWeight: 0.3
 ---
