@@ -34,11 +34,11 @@ spec:
                 predictionWindowMinutes:
                   type: integer
                   minimum: 1
-                  default: 2
+                  default: 15
                 predictionWindowSeconds:
                   type: integer
                   minimum: 1
-                  default: 120
+                  default: 900
                   description: "Number of seconds to look ahead for predictions"
                 historicalWeight:
                   type: number
