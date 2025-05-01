@@ -8,6 +8,7 @@ import time
 import math
 import random
 import threading
+import traceback
 
 POLL_INTERVAL = 1  # seconds
 
@@ -16,24 +17,24 @@ now_pst = datetime.datetime.now(PST)
 timestamp_str = now_pst.strftime("%-m_%-d_%Y__%-I_%M_%S_%p").lower()
 
 # Configuration
-fall_sigma_min = 12
-plateau_min = 12
-
+fall_sigma_min = 25
+plateau_min = 20
+# Configuration
 PEAK_PARAMS = [
-    (i * 60, 1.0, i, fall_sigma_min - (i // 2.5), plateau_min - (i // 2.5))
-    for i in range(0, 25)
+  # (hour, weight, rise_sigma_min, fall_sigma_min, plateau_min)
+    (1*60,  1.0,       1,             fall_sigma_min,  plateau_min ),
+    (4*60,  0.98,      2,             fall_sigma_min,  plateau_min ),   # e.g. 7AM peak, fall_sigma_min‑min rise, 20‑min flat, fall_sigma_min‑min fall
+    (7*60,  1.0,       5,             fall_sigma_min,  plateau_min ),   
+    (10*60,  1.0,      8,             fall_sigma_min,  plateau_min ),  
+    (13*60,  1.0,      14,             fall_sigma_min,  plateau_min ),   
+    (16*60, 1.0,      18,             fall_sigma_min,  plateau_min ),
+    (19*60, 1.0,      21,             fall_sigma_min,  plateau_min ),
+    (22*60, 1.0,      24,             fall_sigma_min,  plateau_min ),
 ]
 
-# generates:
-# PEAK_PARAMS = [
-#     # (hour, weight, rise_sigma_min, fall_sigma_min, plateau_min)
-#     (1*60, 1.0,  1,  fall_sigma_min,  plateau_min ),   # e.g. 7AM peak, fall_sigma_min‑min rise, 20‑min flat, fall_sigma_min‑min fall
-#     (2*60, 1.0,  2, fall_sigma_min,  plateau_min ),   # noon
-#     (3*60, 1.0,  3,  fall_sigma_min,  plateau_min ),   # 6PM
-#     ...
-# ]
-MAX_RATE = 105       # Maximum requests/sec
-MIN_RATE = 8        # Minimum requests/sec
+MAX_RATE = 620       # Maximum requests/sec
+MIN_RATE = 30        # Minimum requests/sec
+
 
 # overprovision
 THREADS = 1
@@ -43,12 +44,21 @@ DURATION_SECONDS = 60  # Test duration in seconds
 # traffic configuration
 HISTORICAL_DATA_FILE = f"load_test_data_{timestamp_str}.csv"
 LOAD_TEST_LOG = f"load_test_{timestamp_str}.log"
+POD_INFO_CSV = f"pod_scaling_samples_{timestamp_str}.csv"
 OUTPUT_DIR = "./output"
-HISTORICAL_DATA_FILE = os.path.join(OUTPUT_DIR, HISTORICAL_DATA_FILE)
-LOAD_TEST_LOG = os.path.join(OUTPUT_DIR, LOAD_TEST_LOG)
+LOAD_TEST_OUTPUT_DIR = OUTPUT_DIR+ "/loads"
+LOG_OUTPUT_DIR = OUTPUT_DIR + "/log"
+POD_OUTPUT_DIR = OUTPUT_DIR + "/pod_info"
+
+HISTORICAL_DATA_FILE = os.path.join(LOAD_TEST_OUTPUT_DIR, HISTORICAL_DATA_FILE)
+LOAD_TEST_LOG = os.path.join(LOG_OUTPUT_DIR, LOAD_TEST_LOG)
+POD_INFO_CSV = os.path.join(POD_OUTPUT_DIR, POD_INFO_CSV)
+
 # Ensure output directory exists
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-
+os.makedirs(LOAD_TEST_OUTPUT_DIR, exist_ok=True)
+os.makedirs(LOG_OUTPUT_DIR, exist_ok=True)
+os.makedirs(POD_OUTPUT_DIR, exist_ok=True)
 
 def custom_time(*args):
     return datetime.now(PST).timetuple()
@@ -85,27 +95,106 @@ def initialize_historical_data():
                 logging.error(f"Historical data file '{HISTORICAL_DATA_FILE}' headers do not match expected format.")
                 raise ValueError("Historical data file headers do not match expected format.")
 
-def get_hpa_info():
+def compute_scale_up_latencies(samples):
+    scale_events = []
+    last_desired = None
+
+    for entry in samples:
+        t = entry['timestamp']
+        ready = entry['ready_pods']
+        desired = entry['desired_replicas']
+
+        if last_desired is not None and desired > last_desired:
+            # HPA triggered scale-up
+            scale_events.append({
+                'scale_time': t,
+                'desired': desired,
+                'ready_at': None
+            })
+        last_desired = desired
+
+        # Fill in "ready_at" once enough pods are ready
+        for event in scale_events:
+            if event['ready_at'] is None and ready >= event['desired']:
+                event['ready_at'] = t
+
+    # Calculate latencies
+    for event in scale_events:
+        if event['ready_at']:
+            latency = event['ready_at'] - event['scale_time']
+            print(f"Scale to {event['desired']} pods: took {latency:.2f} sec to become ready")
+        else:
+            print(f"Scale to {event['desired']} pods: never fully ready during test")
+
+def get_ready_pods_count() -> int:
+    cmd = "kubectl get pods -l app=simpleweb -o json | jq '[.items[] | select(.status.phase==\"Running\") | select(all(.status.containerStatuses[]; .ready==true))] | length'"
+    output = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
+    return int(output)
+
+def get_hpa_status() -> tuple[int, int]:
+    cmd = "kubectl get hpa simpleweb-hpa -o json | jq -c '[.status.desiredReplicas, .status.currentReplicas]'"
+    output = subprocess.check_output(cmd, shell=True).decode('utf-8').strip().split(',')
+    desired = int(output[0].strip('[]'))
+    current = int(output[1].strip('[]'))
+    return current, desired
+
+def get_hpa_info() -> tuple[int, int, int]:
     """
     return tuple of (pod_count, desiredReplicas, currentReplicas, nodes_count)
     """
-    # pod_count=$(kubectl get pods -l app=simpleweb -o json | jq '.items | length')
-    # hpa_status=$(kubectl get hpa simpleweb-hpa -o json | jq -c '[.status.desiredReplicas, .status.currentReplicas]')
-    # nodes_count=$(kubectl get nodes --no-headers | wc -l)
-    # the above works in bash, now do python
     try:
-        pod_count = subprocess.check_output("kubectl get pods -l app=simpleweb -o json | jq '.items | length'", shell=True)
-        pod_count = int(pod_count.strip())
-        hpa_status = subprocess.check_output("kubectl get hpa simpleweb-hpa -o json | jq -c '[.status.desiredReplicas, .status.currentReplicas]'", shell=True)
-        hpa_status = hpa_status.decode('utf-8').strip().split(',')
-        desired_replicas = int(hpa_status[0].strip('[]'))
-        current_replicas = int(hpa_status[1].strip('[]'))
-        nodes_count = subprocess.check_output("kubectl get nodes --no-headers | wc -l", shell=True)
-        nodes_count = int(nodes_count.strip())
-        return pod_count, desired_replicas, current_replicas, nodes_count
+        pod_count = get_ready_pods_count()
+        current_replicas, desired_replicas = get_hpa_status()
+        return pod_count, desired_replicas, current_replicas
     except subprocess.CalledProcessError as e:
         logging.error(f"Error getting HPA info: {e}")
         return 0, 0, 0, 0
+
+def sample_pod_counts(duration, interval, samples, test_start_time):
+    start_time = time.time()
+    while time.time() - start_time < duration:
+        timestamp = time.time()
+        pod_count, desired_replicas, current_replicas = get_hpa_info()
+        entry = {
+            'timestamp': timestamp,
+            'ready_pods': pod_count,
+            'desired_replicas': desired_replicas,
+            'current_replicas': current_replicas
+        }
+        samples.append(entry)
+        save_pod_sample_to_csv(test_start_time, entry)
+        time.sleep(interval)
+
+def save_pod_sample_to_csv(test_start_time, entry):
+    """
+    Append a single pod sample entry to the CSV during test execution.
+    """
+    filename = POD_INFO_CSV
+    with open(filename, mode='a', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow([
+            test_start_time.strftime('%Y-%m-%d %H:%M:%S'),
+            datetime.fromtimestamp(entry['timestamp']).strftime('%Y-%m-%d %H:%M:%S'),
+            entry['ready_pods'],
+            entry['desired_replicas'],
+            entry['current_replicas']
+        ])
+
+def init_pod_samples_csv():
+    """
+    Initialize the CSV file by writing headers if it doesn't already exist.
+    """
+    filename = POD_INFO_CSV
+    if not os.path.exists(filename) or os.path.getsize(filename) == 0:
+        with open(filename, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([
+                "test_start_time",
+                "sample_time",
+                "ready_pods",
+                "desired_replicas",
+                "current_replicas"
+            ])
 
 _noise_prev = 0.0
 def correlated_noise(alpha=0.9, scale=0.015):
@@ -182,8 +271,7 @@ def parse_wrk2_output(output):
         if line.startswith('Requests/sec:'):
             data['requests_per_sec'] = float(line.split()[1])
         elif line.startswith('Transfer/sec:'):
-            transfer = line.split()[1].replace('MB', '').replace('KB', 'e-3')
-            data['transfer_per_sec_mb'] = float(transfer)
+            data['transfer_per_sec_mb'] = parse_with_units(line.split()[1])
         elif line.startswith('Latency   '):
             parts = line.split()
             data['latency_avg_ms'] = parse_time(parts[1])
@@ -192,16 +280,16 @@ def parse_wrk2_output(output):
             data['latency_stdev_pct'] = float(parts[4].replace('%', ''))
         elif line.startswith('Req/Sec  '):
             parts = line.split()
-            data['req_sec_avg'] = float(parts[1])
-            data['req_sec_stdev'] = float(parts[2])
-            data['req_sec_max'] = float(parts[3])
+            data['req_sec_avg'] = parse_with_units(parts[1])
+            data['req_sec_stdev'] = parse_with_units(parts[2])
+            data['req_sec_max'] = parse_with_units(parts[3])
             data['req_sec_stdev_pct'] = float(parts[4].replace('%', ''))
         elif 'requests in ' in line and 'read' in line:
             # Handle lines like: "4800 requests in 1.00m, 30.95MB read"
             clean_line = line.replace(',', ' ')  # Remove comma from duration
             parts = clean_line.split()
             data['total_requests'] = int(parts[0])
-            data['data_transferred_mb'] = float(parts[4].replace('MB', '').replace('KB', 'e-3'))
+            data['data_transferred_mb'] = parse_with_units(parts[4])
         elif line.startswith('Latency Distribution'):
             in_percentiles = True
         elif in_percentiles and '%' in line:
@@ -228,6 +316,28 @@ def parse_time(value):
         if value.endswith(unit):
             return float(value[:-len(unit)]) * multiplier
     return float(value)
+
+def parse_with_units(s):
+    try:
+        s = s.strip().upper().replace(',', '')
+        if s.endswith('MB'):
+            return round(float(s[:-2]), 2)
+        elif s.endswith('KB'):
+            return round(float(s[:-2]) * 1e-3, 2)
+        elif s.endswith('K'):
+            return round(float(s[:-1]) * 1e3, 2)
+        elif s.endswith('M'):
+            return round(float(s[:-1]) * 1e6, 2)
+        elif s.endswith('B'):
+            return round(float(s[:-1]), 2)
+        else:
+            return round(float(s), 2)
+    except Exception as e:
+        print_and_log("An unexpected error occurred during load test.")
+        print_and_log(f"Exception: {repr(e)}")
+        tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+        print_and_log(f"Full traceback:\n{tb}")
+        return 0
 
 def print_and_log(p):
     logging.info(p)
@@ -262,24 +372,17 @@ def write_historical_data(
             parsed['p99.999_ms'], parsed['p100_ms']
         ])
 
-def sample_pod_counts(duration, interval, samples):
-    start_time = time.time()
-    while time.time() - start_time < duration:
-        timestamp = time.time()
-        pod_count = get_hpa_info()[0]
-        samples.append((timestamp, pod_count))
-        time.sleep(interval)
-
 def calculate_weighted_pod_average(samples):
     if len(samples) < 2:
-        return samples[0][1] if samples else 0
+        return samples[0]['ready_pods'] if samples else 0
 
     weighted_sum = 0
     total_time = 0
     for i in range(1, len(samples)):
-        duration = samples[i][0] - samples[i-1][0]
-        weighted_sum += samples[i-1][1] * duration
+        duration = samples[i]['timestamp'] - samples[i-1]['timestamp']
+        weighted_sum += samples[i-1]['ready_pods'] * duration
         total_time += duration
-    
+
     weighted_avg = round(weighted_sum / total_time, 2)
     return weighted_avg if total_time > 0 else 0
+

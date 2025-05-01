@@ -28,7 +28,7 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
     def compute_matrix_multiplication(self):
         # Create two large random matrices
 
-        size = random.randint(10, 100)
+        size = random.randint(15, 35)
 
         print(f"Executing Matrix Multiplication task with size={size}x{size}")
         matrix1 = [[random.random() for _ in range(size)] for _ in range(size)]
@@ -93,13 +93,13 @@ class HandlerClass(http.server.SimpleHTTPRequestHandler):
             task_name = None
             result = None
             
-            if random.random() < 0.5:
+            if random.random() < 1.0:
                 task_executed = True
                 tasks = {
-                    self.compute_fibonacci: "Fibonacci",
+                    # self.compute_fibonacci: "Fibonacci",
                     self.compute_matrix_multiplication: "Matrix Multiplication",
-                    self.find_large_primes: "Large Primes",
-                    self.compute_string_permutations: "String Permutations"
+                    # self.find_large_primes: "Large Primes",
+                    # self.compute_string_permutations: "String Permutations"
                 }
                 chosen_task = random.choice(list(tasks.keys()))
                 task_name = tasks[chosen_task]

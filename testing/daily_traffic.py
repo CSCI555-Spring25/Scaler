@@ -10,21 +10,24 @@ fall_sigma_min = 12
 plateau_min = 12
 # Configuration
 
+# Configuration
+fall_sigma_min = 25
+plateau_min = 20
+# Configuration
 PEAK_PARAMS = [
-    (i * 60, 1.0, i, fall_sigma_min - (i // 2.5), plateau_min - (i // 2.5))
-    for i in range(0, 25)
+  # (hour, weight, rise_sigma_min, fall_sigma_min, plateau_min)
+    (1*60,  1.0,       1,             fall_sigma_min,  plateau_min ),
+    (4*60,  0.98,      2,             fall_sigma_min,  plateau_min ),   # e.g. 7AM peak, fall_sigma_min‑min rise, 20‑min flat, fall_sigma_min‑min fall
+    (7*60,  1.0,       5,             fall_sigma_min,  plateau_min ),   
+    (10*60,  1.0,      8,             fall_sigma_min,  plateau_min ),  
+    (13*60,  1.0,      14,             fall_sigma_min,  plateau_min ),   
+    (16*60, 1.0,      18,             fall_sigma_min,  plateau_min ),
+    (19*60, 1.0,      21,             fall_sigma_min,  plateau_min ),
+    (22*60, 1.0,      24,             fall_sigma_min,  plateau_min ),
 ]
 
-# generates:
-# PEAK_PARAMS = [
-#     # (hour, weight, rise_sigma_min, fall_sigma_min, plateau_min)
-#     (1*60, 1.0,  1,  fall_sigma_min,  plateau_min ),   # e.g. 7AM peak, fall_sigma_min‑min rise, 20‑min flat, fall_sigma_min‑min fall
-#     (2*60, 1.0,  2, fall_sigma_min,  plateau_min ),   # noon
-#     (3*60, 1.0,  3,  fall_sigma_min,  plateau_min ),   # 6PM
-#     ...
-# ]
-MAX_RATE = 105       # Maximum requests/sec
-MIN_RATE = 10        # Minimum requests/sec
+MAX_RATE = 620       # Maximum requests/sec
+MIN_RATE = 30        # Minimum requests/sec
 
 
 OUTPUT_CSV = "daily_traffic.csv"

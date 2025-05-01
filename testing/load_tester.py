@@ -4,21 +4,27 @@ import datetime
 import logging
 import pytz
 import threading
+import traceback
 
 PST = pytz.timezone('US/Pacific')
 now_pst = datetime.datetime.now(PST)
 
-HOST_URL = "http://128.105.146.155/"
+HOST_URL = "http://130.127.132.204/"
 
 def run_load_test():
     now = datetime.datetime.now()
     rate = calculate_traffic_rate(now)
 
+    init_pod_samples_csv()
+
     cmd = f"wrk2 -t{THREADS} -c{CONNECTIONS} -d{DURATION_SECONDS}s -R{rate} --latency {HOST_URL}"
     print_and_log(f"Test Started: {now.hour}:{now.minute} rate: {rate} pods: {get_hpa_info()[0]}")
 
     pod_samples = []
-    sampler = threading.Thread(target=sample_pod_counts, args=(DURATION_SECONDS, POLL_INTERVAL, pod_samples))
+    sampler = threading.Thread(
+        target=sample_pod_counts,
+        args=(DURATION_SECONDS, POLL_INTERVAL, pod_samples, now)
+    )
     sampler.start()
 
     try:
@@ -41,7 +47,10 @@ def run_load_test():
     except subprocess.CalledProcessError as e:
         print_and_log(f"Test failed: {e.stderr}")
     except Exception as e:
-        print_and_log(f"Error: {str(e)}")
+        print_and_log("An unexpected error occurred during load test.")
+        print_and_log(f"Exception: {repr(e)}")
+        tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+        print_and_log(f"Full traceback:\n{tb}")
 
 
 

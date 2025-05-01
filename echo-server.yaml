@@ -20,9 +20,27 @@ spec:
         - containerPort: 80
         resources:
           requests:
-            cpu: "100m"
+            cpu: "400m"
           limits:
-            cpu: "110m"
+            cpu: "420m"
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - sh
+              - -c
+              - "date +%s > /tmp/start_time"
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - |
+              if [ $(($(date +%s) - $(cat /tmp/start_time))) -gt 240 ]; then exit 0; else exit 1; fi
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          failureThreshold: 100
+          successThreshold: 1
 
 ---
 apiVersion: v1

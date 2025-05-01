@@ -1,0 +1,59 @@
+2025-04-30 00:02:05,942 - Test Stats: 
+PEAK_PARAMS = [(60, 1.0, 1, 20, 20), (240, 0.98, 3, 20, 20), (420, 1.0, 6, 20, 20), (600, 1.0, 10, 20, 20), (780, 1.0, 15, 20, 20), (960, 1.0, 21, 20, 20), (1140, 1.0, 24, 20, 20), (1320, 1.0, 24, 20, 20)]
+MAX_RATE = 450
+MIN_RATE = 50
+THREADS = 1
+CONNECTIONS = 8
+2025-04-30 00:02:05,942 - Test start time: 4_30_2025__12_02_05_am
+2025-04-30 00:02:06,108 - Test Started: 3:2 rate: 81 pods: 3
+2025-04-30 00:03:14,176 - An unexpected error occurred during load test.
+2025-04-30 00:03:14,176 - Exception: TimeoutExpired('wrk2 -t1 -c8 -d60s -R81 --latency http://130.127.132.204/', 68)
+2025-04-30 00:03:14,178 - Full traceback:
+Traceback (most recent call last):
+  File "/users/eboots/Desktop/Scaler/testing/load_tester.py", line 29, in run_load_test
+    result = subprocess.run(cmd, shell=True, check=True,
+  File "/usr/lib/python3.10/subprocess.py", line 505, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+  File "/usr/lib/python3.10/subprocess.py", line 1154, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+  File "/usr/lib/python3.10/subprocess.py", line 2022, in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+  File "/usr/lib/python3.10/subprocess.py", line 1198, in _check_timeout
+    raise TimeoutExpired(
+subprocess.TimeoutExpired: Command 'wrk2 -t1 -c8 -d60s -R81 --latency http://130.127.132.204/' timed out after 68 seconds
+
+2025-04-30 00:03:14,342 - Test Started: 3:3 rate: 64 pods: 3
+2025-04-30 00:04:22,412 - An unexpected error occurred during load test.
+2025-04-30 00:04:22,412 - Exception: TimeoutExpired('wrk2 -t1 -c8 -d60s -R64 --latency http://130.127.132.204/', 68)
+2025-04-30 00:04:22,412 - Full traceback:
+Traceback (most recent call last):
+  File "/users/eboots/Desktop/Scaler/testing/load_tester.py", line 29, in run_load_test
+    result = subprocess.run(cmd, shell=True, check=True,
+  File "/usr/lib/python3.10/subprocess.py", line 505, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+  File "/usr/lib/python3.10/subprocess.py", line 1154, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+  File "/usr/lib/python3.10/subprocess.py", line 2022, in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+  File "/usr/lib/python3.10/subprocess.py", line 1198, in _check_timeout
+    raise TimeoutExpired(
+subprocess.TimeoutExpired: Command 'wrk2 -t1 -c8 -d60s -R64 --latency http://130.127.132.204/' timed out after 68 seconds
+
+2025-04-30 00:04:22,588 - Test Started: 3:4 rate: 71 pods: 3
+2025-04-30 00:05:30,656 - An unexpected error occurred during load test.
+2025-04-30 00:05:30,656 - Exception: TimeoutExpired('wrk2 -t1 -c8 -d60s -R71 --latency http://130.127.132.204/', 68)
+2025-04-30 00:05:30,657 - Full traceback:
+Traceback (most recent call last):
+  File "/users/eboots/Desktop/Scaler/testing/load_tester.py", line 29, in run_load_test
+    result = subprocess.run(cmd, shell=True, check=True,
+  File "/usr/lib/python3.10/subprocess.py", line 505, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+  File "/usr/lib/python3.10/subprocess.py", line 1154, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+  File "/usr/lib/python3.10/subprocess.py", line 2022, in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+  File "/usr/lib/python3.10/subprocess.py", line 1198, in _check_timeout
+    raise TimeoutExpired(
+subprocess.TimeoutExpired: Command 'wrk2 -t1 -c8 -d60s -R71 --latency http://130.127.132.204/' timed out after 68 seconds
+
+2025-04-30 00:05:30,824 - Test Started: 3:5 rate: 86 pods: 3

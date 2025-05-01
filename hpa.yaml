@@ -15,14 +15,14 @@ spec:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 75
+        averageUtilization: 70
   behavior:
       scaleUp:
-        stabilizationWindowSeconds: 120 # A delay window: how long HPA waits before acting on scale up/down recommendations.
+        stabilizationWindowSeconds: 30 # A delay window: how long HPA waits before acting on scale up/down recommendations.
         policies:
         - type: Pods
-          value: 2
-          periodSeconds: 60 # what is the limit per this period of time. A rate limit window: how many replicas can be added/removed during this time.
+          value: 6
+          periodSeconds: 15 # what is the limit per this period of time. A rate limit window: how many replicas can be added/removed during this time.
       scaleDown:
         stabilizationWindowSeconds: 60
         policies:

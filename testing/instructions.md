@@ -26,6 +26,10 @@ wrk2 -t1 -c8 -d60s -R113 --latency http://128.105.146.155/
 wrk2 -t1 -c8 -d60s -R10 --latency http://128.105.146.155/
 
 
+kubectl rollout restart deployment simpleweb-deployment
+kubectl delete pod -l app=simpleweb
+kubectl rollout status deployment simpleweb-deployment
+
 
 # Testing Instructions
 
