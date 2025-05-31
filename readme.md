@@ -1,4 +1,16 @@
-# How It Works
+# Predictive Autoscaler for Kubernetes
+
+A Kubernetes controller that implements predictive autoscaling based on historical workload patterns. This controller extends Kubernetes' Horizontal Pod Autoscaler (HPA) by incorporating predictive analytics to anticipate scaling needs before they occur.
+
+## Features
+
+- Predictive scaling based on historical workload patterns
+- Configurable prediction intervals and algorithms
+- Persistent storage of historical data
+- Seamless integration with existing Kubernetes HPA
+- Support for custom metrics and scaling rules
+
+## Architecture
 
 The controller:
 1. Monitors the creation, update, and deletion of PredictiveAutoscaler custom resources
@@ -8,210 +20,142 @@ The controller:
 5. Updates the historical data with the weighted formula
 6. Stores this data persistently for future predictions
 
-This implementation provides a clean separation of code and configuration, making it easier to develop, test, and maintain the controller.
+## Prerequisites
 
-## Deployment Instructions
+- Kubernetes cluster (v1.19+)
+- kubectl configured to communicate with your cluster
+- Docker installed for building the controller image
+- Access to a container registry (Docker Hub, GCR, etc.)
 
-### Build and Push the Controller Image
+## Quick Start
 
-Navigate to the controller directory
-cd CSCI555/Scaler/controller
+### 1. Build and Push the Controller Image
 
-Build the Docker image
-`docker build -t predictive-autoscaler:latest .`
-
-Tag and push to your container registry
-`docker tag predictive-autoscaler:latest anirudhr120100/csci555-predictive-autoscaler:latest`
-
-`docker push anirudhr120100/csci555-predictive-autoscaler:latest`
-
-### Update the controller deployment with your image registry
-Edit /Scaler/deploy/controller-deployment.yaml 
-
-### Apply CRD first
-`kubectl apply -f Scaler/crd/predictive-autoscaler-crd.yaml`
-
-### Apply RBAC
-`kubectl apply -f Scaler/deploy/rbac.yaml`
-
-### Apply controller deployment
-`kubectl apply -f Scaler/deploy/controller-deployment.yaml`
-
-### Check if the controller is running
-`kubectl get pods -l app=predictive-autoscaler-controller`
-
-### Apply the PredictiveAutoscaler instance
-`kubectl apply -f Scaler/deploy/predictive-autoscaler-instance.yaml`
-
-### Check if the PredictiveAutoscaler custom resource was created 
-`kubectl get predictiveautoscalers` 
-or
-`kubectl get pa` (using the short name)
-
-### Test the controller
-
-#### Create the directory in your persistent volume if needed
-POD_NAME=$(kubectl get pods -l app=predictive-autoscaler-controller -o jsonpath="{.items[0].metadata.name}")
-`kubectl exec -it $POD_NAME -- mkdir -p /data`
-
-#### Copy sample data to your controller pod
-You can choose one of the following sample data files:
-
-##### Option 1: Realistic traffic data
-`kubectl cp Scaler/test-data/realistic-traffic.json predictive-autoscaler-controller-xxx:/data/default_simpleweb-predictor_history.json`
-
-##### Option 2: Traffic data with 1-minute intervals
-```
-# Get the pod name
-POD_NAME=$(kubectl get pods -l app=predictive-autoscaler-controller -o jsonpath="{.items[0].metadata.name}")
-
-# Copy the traffic data
-kubectl cp Scaler/testing/json/traffic_1_interval.json $POD_NAME:/data/traffic_1_interval.json
-```
-
-#### Check the logs to see if the controller is using the data correctly
-`kubectl logs -f deployment/predictive-autoscaler-controller`
-
-#### Check if the HPA is being updated
-`kubectl get hpa`
-
-### Modifying HPA Controller's Sync Period
-
-By default, the Kubernetes HPA controller checks metrics every 15 seconds. For testing your predictive autoscaling system with less reactive scaling, you can increase this interval:
-
-1. Edit the kube-controller-manager configuration:
 ```bash
-# For kubeadm-based clusters (like Cloudlab's K8s profile):
-sudo nano /etc/kubernetes/manifests/kube-controller-manager.yaml
+# Navigate to the controller directory
+cd controller
+
+# Build the Docker image
+docker build -t predictive-autoscaler:latest .
+
+# Tag and push to your container registry
+docker tag predictive-autoscaler:latest <your-registry>/predictive-autoscaler:latest
+docker push <your-registry>/predictive-autoscaler:latest
 ```
 
-2. Find the `spec.containers.command` section and add or modify the following flag:
+### 2. Deploy the Controller
+
+```bash
+# Apply the CRD
+kubectl apply -f crd/predictive-autoscaler-crd.yaml
+
+# Apply RBAC permissions
+kubectl apply -f deploy/rbac.yaml
+
+# Update the controller deployment with your image
+kubectl apply -f deploy/controller-deployment.yaml
+
+# Verify the controller is running
+kubectl get pods -l app=predictive-autoscaler-controller
+```
+
+### 3. Create a PredictiveAutoscaler Instance
+
+```bash
+# Apply the example configuration
+kubectl apply -f deploy/predictive-autoscaler-instance.yaml
+
+# Verify the resource was created
+kubectl get predictiveautoscalers
+# or using the short name
+kubectl get pa
+```
+
+## Configuration
+
+### PredictiveAutoscaler Custom Resource
+
+The controller is configured using a custom resource. Here's an example configuration:
+
 ```yaml
-- --horizontal-pod-autoscaler-sync-period=1m  # Changed from 15s to 1m (1 minute)
+apiVersion: autoscaling.example.com/v1
+kind: PredictiveAutoscaler
+metadata:
+  name: example-predictor
+spec:
+  targetHPA: example-hpa
+  namespace: default
+  predictionInterval: 5m
+  historyRetention: 24h
+  algorithm:
+    type: weighted
+    weight: 0.7
 ```
 
-3. Save the file - Kubernetes will automatically restart the controller manager with the new configuration.
+### Parameters
 
-4. Verify the changes have been applied:
+- `targetHPA`: Name of the HPA to control
+- `namespace`: Kubernetes namespace
+- `predictionInterval`: How often to make predictions
+- `historyRetention`: How long to keep historical data
+- `algorithm`: Prediction algorithm configuration
+
+## Testing
+
+### Using Sample Data
+
+The repository includes sample traffic data for testing:
+
 ```bash
-# Check if the new flag is present in the controller manager configuration
-kubectl describe pod -n kube-system kube-controller-manager-node-0
+# Get the controller pod name
+POD_NAME=$(kubectl get pods -l app=predictive-autoscaler-controller -o jsonpath="{.items[0].metadata.name}")
+
+# Copy sample data
+kubectl cp test-data/realistic-traffic.json $POD_NAME:/data/default_simpleweb-predictor_history.json
 ```
 
-5. For Microk8s clusters:
-```bash
-# Edit the microk8s controller manager configuration
-sudo nano /var/snap/microk8s/current/args/kube-controller-manager
-# Add the flag: --horizontal-pod-autoscaler-sync-period=1m
-sudo microk8s.stop
-sudo microk8s.start
-```
+### Automated Testing
 
-This modification will make the HPA evaluate scaling decisions less frequently, putting more emphasis on the predictive scaling approach.
-
-#### Check if the historical data is being updated
-`kubectl get predictiveautoscalers`
-
-### Automated Testing with 1-minute Traffic Data
-
-A convenient script has been added to automate the deployment and testing with traffic_1_interval.json:
+Use the provided test script:
 
 ```bash
-cd CSCI555/Scaler/testing
+cd testing
 ./test_with_traffic_1_interval.sh
 ```
 
-This script will:
-1. Apply the CRD, RBAC, and controller deployment
-2. Wait for the controller pod to be ready
-3. Copy the traffic_1_interval.json file to the controller pod
-4. Deploy the simpleweb application and HPA
-5. Create the PredictiveAutoscaler instance
-6. Provide commands for monitoring the system
+## Monitoring
 
-# Kubernetes Cluster Deployment instructions on Cloudlab
+### View Controller Logs
 
-Cloudlabs has pre-existing profiles. Select the K8s
+```bash
+kubectl logs -f deployment/predictive-autoscaler-controller
+```
 
-1. Click Experiment -> Start experiment
-2. Click change profile
-3. Click on K8s profile from select window
-4. Click confirm and next to the parameterize page. 
-5. Make edits to the parameters(optional)
-6. Click next to the Finalize Page.
--> Assign a name and cluster location
-7. Click next to the schedule page.
-8. Pick a time to deploy and click next
+### Check HPA Status
 
-Once the cluster starts, click "extend" to extend the cluster
-expiration by 7 days.
+```bash
+kubectl get hpa
+```
 
-## Starting K8s and docker on the cluster
+### View Historical Data
 
-### SSH to node-0
-Click on the node in the node graph
-click on "Shell" from the pop-up menu
+```bash
+kubectl get predictiveautoscalers
+```
 
-### Install Docker
-#### Only do the following if docker is not installed.
+## Contributing
 
-Dependencies:
-sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-Docker GPG keys
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+## License
 
-Create the docker repository
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-Install docker:
-sudo apt install -y docker-ce docker-ce-cli containerd.io
+## Acknowledgments
 
-Start docker
-sudo systemctl enable docker
-sudo systemctl start docker
-
-### Install Kubectl
-#### Only do the following if Kubernetes is not installed
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-kubectl version --client
-
-
-### Clone GitHub repo
-#### Git installation
-sudo apt install -y git
-
-#### Clone the repo
-git clone https://github.com/CSCI555-Spring25/Scaler.git
-
-
-### Building and registering docker container on the registry
-
-1. navigate to "webserver" folder
-2. Create docker container using "docker build -t simpleweb:latest ."
-3. Find the IP of the node/registry using the following command:
-    docker ps | grep "registry:2"
-4. If the local registry is not running, run the following to start the registry and go back to step 3: 
-    "docker run -d -p 5000:5000 --name registry registry:2"
-5. Once IP is known, for example 10.10.1.1
-Tag and push the docker container to the registry
-    docker tag simpleweb:latest 10.10.1.1:5000/simpleweb:latest
-    docker push 10.10.1.1:5000/simpleweb:latest
-6. If the ip address is not 10.10.1.1:5000, edit spec/template/spec/containers/image to have the correct IP address
-
-
-### Starting kubernetes service
-1. navigate to root directory of Scaler github repo
-2. Start the webserver with kubernetes:
-    kubectl apply -f echo-server.yaml
-3. Check status of the running pods with "kubectl get pods"
-
-
-# kubectl not returning nodes
-If kubectl is giving an error while returning nodes, make sure there is a 
-K8s profile for your user on cloud labs. Use following commands to 
-copy the admin profile into your user directory.
-
-sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-sudo chown $(id -u):$(id -g) $HOME/.kube/config
+- Kubernetes HPA team for the base autoscaling functionality
+- The open-source community for various tools and libraries used in this project
