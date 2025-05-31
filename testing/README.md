@@ -1,111 +1,211 @@
-# Kubernetes Proactive Scaling System
+# Testing Framework for Predictive Autoscaler
 
-This repository contains a set of tools for implementing and testing proactive scaling in Kubernetes. The system uses historical data to predict and scale resources before they're needed, rather than reacting to current load.
+This directory contains comprehensive testing tools and utilities for the Predictive Autoscaler project. The testing framework includes load generation, data analysis, visualization, and monitoring capabilities.
 
-## Components
+## Directory Structure
 
-### 2. Load Tester (`load_tester.py`)
-A realistic load generation tool that:
-- Simulates daily traffic patterns using a Gaussian distribution
-- Peaks at configured times (default: 6 PM)
-- Records historical load data
-- Uses Apache Bench (ab) for load testing
-- Adds random noise to make patterns more realistic
+```
+testing/
+├── README.md                    # This file
+├── config/                      # Configuration files
+│   └── requirements.txt         # Python dependencies
+├── docs/                        # Documentation
+│   ├── instructions.md          # Quick start instructions
+│   └── installation.txt         # Installation guide
+├── scripts/                     # All executable scripts
+│   ├── load_testing/           # Load generation scripts
+│   │   ├── load_tester.py      # Main load testing tool
+│   │   ├── load_tester_utils.py # Load testing utilities
+│   │   ├── fast_load.py        # Fast load generation
+│   │   ├── daily_traffic.py    # Daily traffic simulation
+│   │   └── fast_load_test.py   # Quick load tests
+│   ├── analysis/               # Data analysis and visualization
+│   │   ├── visualize.py        # Data visualization
+│   │   ├── visualize_final.py  # Final analysis visualization
+│   │   └── log_analyzer.py     # Log analysis tools
+│   └── utilities/              # Helper scripts and tools
+│       ├── csv_to_json.py      # Data conversion utility
+│       ├── test_with_traffic_1_interval.sh # Automated test script
+│       └── metrics_collector/  # Metrics collection tools
+├── sample_data/                # Sample and test data
+│   ├── json/                   # JSON format test data
+│   │   ├── traffic_1_interval.json
+│   │   └── traffic_5_interval.json
+│   └── csv/                    # CSV format test data
+│       └── *.csv files
+├── results/                    # Test results and outputs
+│   ├── plots/                  # Generated visualizations
+│   ├── reports/                # Analysis reports
+│   └── logs/                   # Execution logs
+└── archive/                    # Historical data and backups
+```
 
-### 3. Metrics Collector (`metrics_collector.sh`)
-A monitoring script that:
-- Collects cluster metrics every minute
-- Tracks pod counts, HPA status, and node counts
-- Records node creation times for cost analysis
-- Stores data in CSV format for analysis
+## Quick Start
 
-## Prerequisites
+### Prerequisites
 
-- Kubernetes cluster
+- Kubernetes cluster (v1.19+)
 - kubectl configured with cluster access
-- Python 3.6+
+- Python 3.7+
 - Apache Bench (ab) installed
-- Required Python packages:
-  ```
-  pip install schedule
-  ```
 
-## Setup
+### Setup
 
-1. Clone this repository:
+1. Install Python dependencies:
    ```bash
-   git clone <repository-url>
-   cd <repository-name>
+   pip install -r config/requirements.txt
    ```
 
 2. Configure your environment:
-   - Update `HOST_URL` in `load_tester.py`
-   - Adjust `MAX_REQUESTS` and `PEAK_HOUR` in `load_tester.py`
-   - Modify `max_pods` in `proactive_scaler.py` if needed
+   - Update HOST_URL in load testing scripts
+   - Adjust scaling parameters as needed
 
+### Running Tests
 
-## Usage
+#### Automated Testing
+Use the provided automation script for quick testing:
+```bash
+cd scripts/utilities
+./test_with_traffic_1_interval.sh
+```
 
-1. Start the metrics collector:
+#### Manual Testing
+
+1. **Start Load Testing:**
    ```bash
-   chmod +x metrics_collector.sh
-   ./metrics_collector.sh
-   ```
-
-2. Launch the load tester:
-   ```bash
+   cd scripts/load_testing
    python load_tester.py
    ```
 
+2. **Monitor Metrics:**
+   ```bash
+   cd scripts/utilities/metrics_collector
+   ./metrics_collector.sh
+   ```
+
+3. **Analyze Results:**
+   ```bash
+   cd scripts/analysis
+   python visualize.py
+   ```
+
+## Components
+
+### Load Testing (`scripts/load_testing/`)
+
+- **`load_tester.py`**: Main load generation tool with realistic traffic patterns
+- **`load_tester_utils.py`**: Utility functions for load testing
+- **`fast_load.py`**: Quick load generation for testing
+- **`daily_traffic.py`**: Simulates daily traffic patterns
+- **`fast_load_test.py`**: Rapid load testing scenarios
+
+### Analysis Tools (`scripts/analysis/`)
+
+- **`visualize.py`**: Creates charts and graphs from test data
+- **`visualize_final.py`**: Comprehensive analysis and final reports
+- **`log_analyzer.py`**: Analyzes log files and extracts metrics
+
+### Utilities (`scripts/utilities/`)
+
+- **`csv_to_json.py`**: Converts CSV data to JSON format
+- **`test_with_traffic_1_interval.sh`**: Automated test execution
+- **`metrics_collector/`**: Tools for collecting Kubernetes metrics
 
 ## Data Files
 
-The system generates several data files:
-- `historical_data.csv`: Request patterns and error rates
-- `metrics.csv`: Cluster metrics over time
-- `nodes.csv`: Node creation and deletion tracking
-- `load_test.log`: Load testing logs
+### Sample Data (`sample_data/`)
+- **JSON files**: Pre-generated traffic patterns for testing
+- **CSV files**: Historical load test data
 
-## Monitoring
+### Results (`results/`)
+- **Plots**: Generated visualizations and charts
+- **Reports**: Analysis reports in text format
+- **Logs**: Execution logs and debug information
 
-You can monitor the system's performance using:
+## Monitoring and Analysis
+
+### Real-time Monitoring
 ```bash
-# View current pod count
-kubectl get pods -l app=simpleweb
+# View controller logs
+kubectl logs -f deployment/predictive-autoscaler-controller
 
-# Check scaling history
-tail -f metrics.csv
+# Monitor HPA status
+kubectl get hpa -w
 
-# Monitor load testing
-tail -f load_test.log
+# Check pod scaling
+kubectl get pods -l app=simpleweb -w
+```
+
+### Post-test Analysis
+```bash
+# Generate visualizations
+cd scripts/analysis
+python visualize_final.py
+
+# Analyze scaling patterns
+python log_analyzer.py
 ```
 
 ## Customization
 
-### Adjusting Load Patterns
-In `load_tester.py`:
-- `PEAK_HOUR`: Change peak traffic time
-- `MAX_REQUESTS`: Modify maximum request count
-- `SIGMA_MINUTES`: Adjust the spread of the traffic curve
+### Load Patterns
+Modify traffic patterns in `scripts/load_testing/`:
+- Adjust `PEAK_HOUR` for different peak times
+- Change `MAX_REQUESTS` for load intensity
+- Modify `SIGMA_MINUTES` for traffic distribution
 
-### Modifying Scaling Behavior
-In `proactive_scaler.py`:
-- `LOOKBACK_DAYS`: Change historical data analysis period
-- `max_pods`: Adjust maximum pod limit
-- Modify `calculate_desired_pods()` for different scaling algorithms
+### Analysis Parameters
+Configure analysis in `scripts/analysis/`:
+- Update time ranges for analysis
+- Adjust visualization parameters
+- Modify report generation settings
+
+## Best Practices
+
+1. **Before Testing:**
+   - Ensure cluster has sufficient resources
+   - Verify predictive autoscaler is running
+   - Check baseline metrics
+
+2. **During Testing:**
+   - Monitor cluster resource usage
+   - Watch for any error conditions
+   - Document test parameters
+
+3. **After Testing:**
+   - Analyze generated reports
+   - Archive important results
+   - Clean up test resources
 
 ## Troubleshooting
 
-1. If load testing fails:
-   - Verify `HOST_URL` is accessible
-   - Check `load_test.log` for errors
+### Common Issues
+
+1. **Load testing fails:**
+   - Verify target service is accessible
+   - Check network connectivity
    - Ensure Apache Bench is installed
 
-2. If scaling isn't working:
+2. **Metrics collection stops:**
    - Verify kubectl access
-   - Check `historical_data.csv` exists
-   - Ensure deployment name matches in `proactive_scaler.py`
+   - Check cluster connectivity
+   - Ensure sufficient disk space
+
+3. **Analysis scripts error:**
+   - Check data file formats
+   - Verify Python dependencies
+   - Ensure sufficient memory
+
+### Getting Help
+
+- Check logs in `results/logs/`
+- Review error messages in output files
+- Verify configuration in `config/`
 
 ## Contributing
 
-Feel free to submit issues and enhancement requests!
+When adding new testing tools:
+1. Place scripts in appropriate subdirectories
+2. Update this README with new components
+3. Add configuration files to `config/`
+4. Document usage and dependencies 

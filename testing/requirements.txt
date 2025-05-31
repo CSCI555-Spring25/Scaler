@@ -1,4 +1,0 @@
-schedule
-pandas
-matplotlib
-seaborn
